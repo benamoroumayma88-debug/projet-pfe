@@ -1,0 +1,82 @@
+@{
+    ViewData["Title"] = "Power BI Reports";
+}
+
+<div class="page-header">
+    <h1>&#x1F4CA; Power BI Reports</h1>
+    <p class="subtitle">Interactive reports connected live to the InsuranceBI data warehouse</p>
+</div>
+
+<!-- Tab Buttons -->
+<div class="panel" style="margin-bottom:.5rem;">
+    <div class="panel-body" style="padding:.5rem .75rem;">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button onclick="showTab('delay')" id="btn-delay"
+                style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:var(--radius-sm);font-weight:600;font-size:.88rem;border:none;cursor:pointer;background:var(--accent);color:#fff;">
+                &#x23F1;&#xFE0F; Delay Predictions
+            </button>
+            <button onclick="showTab('cost')" id="btn-cost"
+                style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:var(--radius-sm);font-weight:600;font-size:.88rem;border:none;cursor:pointer;background:var(--bg);color:var(--text);">
+                &#x1F4B0; Cost Predictions
+            </button>
+            <button onclick="showTab('fraud')" id="btn-fraud"
+                style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:var(--radius-sm);font-weight:600;font-size:.88rem;border:none;cursor:pointer;background:var(--bg);color:var(--text);">
+                &#x1F6A8; Fraud Detection
+            </button>
+            <button onclick="showTab('forecast')" id="btn-forecast"
+                style="display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border-radius:var(--radius-sm);font-weight:600;font-size:.88rem;border:none;cursor:pointer;background:var(--bg);color:var(--text);">
+                &#x1F4C8; Forecast &amp; Planning
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delay Tab -->
+<div id="tab-delay" class="panel" style="margin-top:0;">
+    <div class="panel-header">&#x23F1;&#xFE0F; Delay Predictions</div>
+    <div class="panel-body p-0">
+        <iframe title="Delay-Predictions"
+                src="https://app.powerbi.com/reportEmbed?reportId=dbbe7a2d-c8f4-42ed-9426-7044397e180b&autoAuth=true&ctid=119689b1-4b51-43b0-9c27-34e6c9279d98"
+                style="width:100%;height:780px;border:none;display:block;"
+                allowfullscreen="true">
+        </iframe>
+    </div>
+</div>
+
+<!-- Cost Tab -->
+<div id="tab-cost" class="panel" style="margin-top:0;display:none;">
+    <div class="panel-header">&#x1F4B0; Cost Predictions</div>
+    <div class="panel-body" style="text-align:center;padding:4rem 2rem;color:var(--text-muted);">
+        <p style="font-size:1.1rem;margin-bottom:.5rem;">Report embed URL not yet configured.</p>
+        <p style="font-size:.88rem;">In Power BI Service: open the Cost report ? <strong>File ? Embed report ? Website or portal</strong> ? copy the src URL and provide it.</p>
+    </div>
+</div>
+
+<!-- Fraud Tab -->
+<div id="tab-fraud" class="panel" style="margin-top:0;display:none;">
+    <div class="panel-header">&#x1F6A8; Fraud Detection</div>
+    <div class="panel-body" style="text-align:center;padding:4rem 2rem;color:var(--text-muted);">
+        <p style="font-size:1.1rem;margin-bottom:.5rem;">Report embed URL not yet configured.</p>
+        <p style="font-size:.88rem;">In Power BI Service: open the Fraud report ? <strong>File ? Embed report ? Website or portal</strong> ? copy the src URL and provide it.</p>
+    </div>
+</div>
+
+<!-- Forecast Tab -->
+<div id="tab-forecast" class="panel" style="margin-top:0;display:none;">
+    <div class="panel-header">&#x1F4C8; Forecast &amp; Planning</div>
+    <div class="panel-body" style="text-align:center;padding:4rem 2rem;color:var(--text-muted);">
+        <p style="font-size:1.1rem;margin-bottom:.5rem;">Report embed URL not yet configured.</p>
+        <p style="font-size:.88rem;">In Power BI Service: open the Forecast report ? <strong>File ? Embed report ? Website or portal</strong> ? copy the src URL and provide it.</p>
+    </div>
+</div>
+
+<script>
+    function showTab(name) {
+        ['delay','cost','fraud','forecast'].forEach(function(t) {
+            document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+            var btn = document.getElementById('btn-' + t);
+            btn.style.background = t === name ? 'var(--accent)' : 'var(--bg)';
+            btn.style.color = t === name ? '#fff' : 'var(--text)';
+        });
+    }
+</script>

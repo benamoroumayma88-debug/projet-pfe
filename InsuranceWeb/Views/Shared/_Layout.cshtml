@@ -1,0 +1,133 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Insurance BI</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-bi">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-controller="Home" asp-action="Index">
+                    &#x1F6E1;&#xFE0F; Insurance BI
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navMenu">
+                    <ul class="navbar-nav ms-3">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
+                            @* Manager & Business Analyst see dashboards *@
+                            @if (userRole == "Manager" || userRole == "Business Analyst")
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" ? "active" : "")"
+                                       asp-controller="Home" asp-action="Index">
+                                        <span class="nav-icon">&#x1F4CA;</span> Overview
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "DelayPredictions" ? "active" : "")"
+                                       asp-controller="DelayPredictions" asp-action="Index">
+                                        <span class="nav-icon">&#x23F1;&#xFE0F;</span> Delay
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "CostPredictions" ? "active" : "")"
+                                       asp-controller="CostPredictions" asp-action="Index">
+                                        <span class="nav-icon">&#x1F4B0;</span> Cost
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "FraudPredictions" ? "active" : "")"
+                                       asp-controller="FraudPredictions" asp-action="Index">
+                                        <span class="nav-icon">&#x1F6A8;</span> Fraud
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Forecast" ? "active" : "")"
+                                       asp-controller="Forecast" asp-action="Index">
+                                        <span class="nav-icon">&#x1F4C8;</span> Forecast
+                                    </a>
+                                </li>
+                            }
+
+                            @* Manager only: Data Upload *@
+                            @if (userRole == "Manager")
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "DataUpload" ? "active" : "")"
+                                       asp-controller="DataUpload" asp-action="Index">
+                                        <span class="nav-icon">&#x1F4C1;</span> Upload
+                                    </a>
+                                </li>
+                            }
+
+                            @* Admin only: Admin Dashboard *@
+                            @if (userRole == "Admin")
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" ? "active" : "")"
+                                       asp-controller="Admin" asp-action="Index">
+                                        <span class="nav-icon">&#x1F6E0;&#xFE0F;</span> Admin
+                                    </a>
+                                </li>
+                            }
+                        }
+                    </ul>
+
+                    <!-- User Menu (Right-aligned) -->
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <ul class="navbar-nav ms-auto">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="nav-icon">👤</span>@User.FindFirst("Login")?.Value
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                                    <li>
+                                        <span class="dropdown-item-text">
+                                            <strong>@User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value</strong><br />
+                                            <small style="color: var(--text-muted);">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</small>
+                                        </span>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="post" asp-controller="Account" asp-action="Logout" style="display:inline;">
+                                            <button type="submit" class="dropdown-item" style="border:none; background:none; cursor:pointer;">
+                                                🚪 Logout
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="page-wrapper">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="footer-bi">
+        &copy; 2026 Insurance BI &mdash; Claims Intelligence Platform
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

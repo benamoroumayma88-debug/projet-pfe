@@ -1,0 +1,22 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Python
+__pycache__/
+*.pyc
+.env
+
+## IDE
+.vs/
+.vscode/
+
+## ML models (large files)
+*.pkl
+*.joblib
+
+## OS
+Thumbs.db
+Desktop.ini

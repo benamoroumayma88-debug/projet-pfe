@@ -1,0 +1,399 @@
+@model InsuranceWeb.Models.ForecastDashboardViewModel
+@{
+    ViewData["Title"] = "Forecast & Planning";
+}
+
+<div class="page-header">
+    <h1>&#x1F4C8; Forecast &amp; Planning Dashboard</h1>
+    <p class="subtitle">6-month claims volume, cost and risk forecasts for strategic resource planning</p>
+    @if (!string.IsNullOrEmpty(Model.SelectedRunId))
+    {
+        <span class="run-badge">Run: @Model.SelectedRunId</span>
+    }
+</div>
+
+<!-- ═══ Run Selector ═══ -->
+@if (Model.AvailableRunIds.Count > 1)
+{
+    <form method="get" class="filter-bar" style="margin-bottom:1.25rem;">
+        <div class="form-group">
+            <label>Forecast Run</label>
+            <select name="runId">
+                @foreach (var run in Model.AvailableRunIds)
+                {
+                    <option value="@run" selected="@(run == Model.SelectedRunId)">@run</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="btn-apply">Load Run</button>
+    </form>
+}
+
+@if (Model.Summary == null)
+{
+    <div class="panel">
+        <div class="panel-body" style="text-align:center;padding:3rem;">
+            <p style="font-size:1.1rem;color:var(--text-muted);">No forecast data available. Run the forecast ML pipeline first.</p>
+        </div>
+    </div>
+}
+else
+{
+    var s = Model.Summary;
+
+    <!-- ═══ KPI Cards ═══ -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-value text-primary">@s.TotalExpectedClaims.ToString("N0")</div>
+            <div class="kpi-label">Total Expected Claims</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-value text-danger">@s.TotalExpectedCostTnd.ToString("N0")</div>
+            <div class="kpi-label">Total Expected Cost (TND)</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-value text-warning">@s.AvgMonthlyDelayRatePct.ToString("F1")%</div>
+            <div class="kpi-label">Avg Delay Rate</div>
+        </div>
+        <div class="kpi-card kpi-critical">
+            <div class="kpi-value text-critical">@s.AvgMonthlyFraudRatePct.ToString("F1")%</div>
+            <div class="kpi-label">Avg Fraud Rate</div>
+        </div>
+        <div class="kpi-card kpi-success">
+            <div class="kpi-value text-success">@s.TotalNetSavingsPotentialTnd.ToString("N0")</div>
+            <div class="kpi-label">Savings Potential (TND)</div>
+        </div>
+        <div class="kpi-card kpi-info">
+            <div class="kpi-value text-info">@s.AvgAgentsNeededPerMonth.ToString("F0")</div>
+            <div class="kpi-label">Avg Agents/Month</div>
+        </div>
+    </div>
+
+    <!-- ═══ Peak / Highlights Panel ═══ -->
+    <div class="panel">
+        <div class="panel-header">&#x1F3AF; Key Highlights</div>
+        <div class="panel-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Forecast Period</div>
+                    <div style="font-size:1.1rem;font-weight:700;">@s.TotalForecastPeriod</div>
+                </div>
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Peak Volume</div>
+                    <div style="font-size:1.1rem;font-weight:700;">@s.PeakVolumeMonth <span style="color:var(--accent);">(@s.PeakVolumeClaims.ToString("N0") claims)</span></div>
+                </div>
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Peak Delay</div>
+                    <div style="font-size:1.1rem;font-weight:700;">@s.PeakDelayMonth <span style="color:var(--danger);">(@s.PeakDelayRatePct.ToString("F1")%)</span></div>
+                </div>
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Peak Cost</div>
+                    <div style="font-size:1.1rem;font-weight:700;">@s.PeakCostMonth <span style="color:var(--danger);">(@s.PeakCostTnd.ToString("N0") TND)</span></div>
+                </div>
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">High Risk Months</div>
+                    <div style="font-size:1.1rem;font-weight:700;color:var(--danger);">@(s.HighRiskMonths ?? "—")</div>
+                </div>
+                <div style="padding:.5rem;">
+                    <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Surge Expected</div>
+                    <div style="font-size:1.1rem;font-weight:700;color:var(--warning);">@(s.SurgeExpectedMonths ?? "—")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Charts ═══ -->
+    @if (Model.MonthlyForecasts.Any())
+    {
+        <div class="grid-2">
+            <div class="panel">
+                <div class="panel-header">&#x1F4CA; Claims Volume & Cost Forecast</div>
+                <div class="panel-body">
+                    <div class="chart-container-lg">
+                        <canvas id="volumeCostChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">&#x26A0;&#xFE0F; Delay & Fraud Rate Trends</div>
+                <div class="panel-body">
+                    <div class="chart-container-lg">
+                        <canvas id="rateChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <div class="panel-header">&#x1F465; Staffing & Workload</div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="staffChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">&#x1F4B0; Savings & ROI Potential</div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="savingsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ═══ Monthly Forecast Table ═══ -->
+    @if (Model.MonthlyForecasts.Any())
+    {
+        <div class="panel">
+            <div class="panel-header">&#x1F4C5; Monthly Forecast Breakdown</div>
+            <div class="panel-body p-0" style="overflow-x:auto;">
+                <table class="table-bi">
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th>Season</th>
+                            <th>Risk</th>
+                            <th>Surge?</th>
+                            <th>Volume</th>
+                            <th>Cost (TND)</th>
+                            <th>Delay %</th>
+                            <th>Fraud %</th>
+                            <th>Agents</th>
+                            <th>Workload</th>
+                            <th>Savings (TND)</th>
+                            <th>ROI %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.MonthlyForecasts)
+                        {
+                            <tr>
+                                <td style="font-weight:600;">@m.Period</td>
+                                <td>@m.SeasonalContext</td>
+                                <td class="text-center">
+                                    @{
+                                        var rl = m.RiskLevel?.ToLower() switch { "critical" => "badge-critical", "high" => "badge-high", "medium" => "badge-medium", _ => "badge-low" };
+                                    }
+                                    <span class="badge-risk @rl">@m.RiskLevel</span>
+                                </td>
+                                <td class="text-center">
+                                    @if (m.IsSurgeMonth)
+                                    {
+                                        <span class="badge-risk badge-yes">+@m.VolumeSurgePct?.ToString("F0")%</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-risk badge-no">No</span>
+                                    }
+                                </td>
+                                <td class="text-right">@m.ForecastClaimVolume.ToString("N0")</td>
+                                <td class="text-right">@m.ForecastTotalIndemnisationTnd.ToString("N0")</td>
+                                <td class="text-center">@m.ForecastDelayRatePct.ToString("F1")%</td>
+                                <td class="text-center">@m.ForecastFraudRatePct.ToString("F1")%</td>
+                                <td class="text-center">@m.KpiRecommendedAgents</td>
+                                <td class="text-center" style="font-weight:600;">@m.KpiWorkloadIndex.ToString("F2")</td>
+                                <td class="text-right" style="color:var(--success);font-weight:600;">@m.KpiNetSavingsPotentialTnd.ToString("N0")</td>
+                                <td class="text-center">@m.KpiInterventionRoiPct.ToString("F0")%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <!-- ═══ Alerts ═══ -->
+    @if (Model.Alerts.Any())
+    {
+        <div class="panel">
+            <div class="panel-header">&#x1F514; Forecast Alerts (@Model.Alerts.Count total)</div>
+            <div class="panel-body">
+                @foreach (var a in Model.Alerts)
+                {
+                    var alertClass = a.AlertLevel?.ToUpper() switch { "CRITICAL" => "alert-critical", "HIGH" => "alert-high", _ => "alert-medium" };
+                    var badgeBg = a.AlertLevel?.ToUpper() switch { "CRITICAL" => "#7c3aed", "HIGH" => "#ef4444", _ => "#f59e0b" };
+                    <div class="alert-card @alertClass">
+                        <span class="alert-badge" style="background:@badgeBg;">@a.AlertLevel</span>
+                        <strong>@a.Period</strong> — <span style="font-weight:600;">[@(a.AlertType?.Replace("_", " "))]</span>
+                        @a.AlertMessage
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ═══ Strategic Insight ═══ -->
+    @if (!string.IsNullOrEmpty(s.StrategicInsight))
+    {
+        <div class="panel">
+            <div class="panel-header">&#x1F9E0; Strategic Insight</div>
+            <div class="panel-body">
+                <p style="font-size:.92rem;line-height:1.65;color:var(--text);margin:0;">@s.StrategicInsight</p>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    @if (Model.MonthlyForecasts.Any())
+    {
+        <script>
+            (function () {
+                const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.Period).ToArray()));
+                const volumes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.ForecastClaimVolume).ToArray()));
+                const costs = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.ForecastTotalIndemnisationTnd).ToArray()));
+                const delayRate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.ForecastDelayRatePct).ToArray()));
+                const fraudRate = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.ForecastFraudRatePct).ToArray()));
+                const agents = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.KpiRecommendedAgents).ToArray()));
+                const workload = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.KpiWorkloadIndex).ToArray()));
+                const savings = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.KpiNetSavingsPotentialTnd).ToArray()));
+                const roi = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.MonthlyForecasts.Select(m => m.KpiInterventionRoiPct).ToArray()));
+
+                // 1. Volume & Cost Chart
+                new Chart(document.getElementById('volumeCostChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Claim Volume',
+                                data: volumes,
+                                backgroundColor: 'rgba(59,130,246,.7)',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Total Cost (TND)',
+                                data: costs,
+                                type: 'line',
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239,68,68,.08)',
+                                tension: .3,
+                                fill: true,
+                                pointRadius: 5,
+                                pointBackgroundColor: '#ef4444',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { position: 'left', title: { display: true, text: 'Claims' }, beginAtZero: true },
+                            y1: { position: 'right', title: { display: true, text: 'Cost (TND)' }, grid: { drawOnChartArea: false }, beginAtZero: true }
+                        }
+                    }
+                });
+
+                // 2. Delay & Fraud Rate
+                new Chart(document.getElementById('rateChart').getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Delay Rate %',
+                                data: delayRate,
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245,158,11,.08)',
+                                tension: .3, fill: true,
+                                pointRadius: 5, pointBackgroundColor: '#f59e0b'
+                            },
+                            {
+                                label: 'Fraud Rate %',
+                                data: fraudRate,
+                                borderColor: '#7c3aed',
+                                backgroundColor: 'rgba(124,58,237,.08)',
+                                tension: .3, fill: true,
+                                pointRadius: 5, pointBackgroundColor: '#7c3aed'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'top' } },
+                        scales: { y: { title: { display: true, text: 'Rate %' }, beginAtZero: true } }
+                    }
+                });
+
+                // 3. Staffing & Workload
+                new Chart(document.getElementById('staffChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Recommended Agents',
+                                data: agents,
+                                backgroundColor: 'rgba(6,182,212,.7)',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Workload Index',
+                                data: workload,
+                                type: 'line',
+                                borderColor: '#f59e0b',
+                                tension: .3,
+                                pointRadius: 5,
+                                pointBackgroundColor: '#f59e0b',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { position: 'left', title: { display: true, text: 'Agents' }, beginAtZero: true },
+                            y1: { position: 'right', title: { display: true, text: 'Workload' }, grid: { drawOnChartArea: false } }
+                        }
+                    }
+                });
+
+                // 4. Savings & ROI
+                new Chart(document.getElementById('savingsChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Net Savings (TND)',
+                                data: savings,
+                                backgroundColor: 'rgba(16,185,129,.7)',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'ROI %',
+                                data: roi,
+                                type: 'line',
+                                borderColor: '#3b82f6',
+                                tension: .3,
+                                pointRadius: 5,
+                                pointBackgroundColor: '#3b82f6',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'top' } },
+                        scales: {
+                            y: { position: 'left', title: { display: true, text: 'TND' }, beginAtZero: true },
+                            y1: { position: 'right', title: { display: true, text: 'ROI %' }, grid: { drawOnChartArea: false } }
+                        }
+                    }
+                });
+            })();
+        </script>
+    }
+}

@@ -1,0 +1,398 @@
+@model InsuranceWeb.Models.FraudDashboardViewModel
+@{
+    ViewData["Title"] = "Fraud Detection";
+}
+
+<div class="page-header">
+    <h1>&#x1F6A8; Fraud Detection Dashboard</h1>
+    <p class="subtitle">Identify suspicious claims, optimise investigation resources and maximise fraud savings</p>
+    @if (!string.IsNullOrEmpty(Model.SelectedRunId))
+    {
+        <span class="run-badge">Run: @Model.SelectedRunId</span>
+    }
+</div>
+
+<!-- ═══ KPI Cards ═══ -->
+@if (Model.Summary != null)
+{
+    var s = Model.Summary;
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-value text-primary">@s.TotalScoredClaims.ToString("N0")</div>
+            <div class="kpi-label">Claims Scored</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-value text-danger">@s.FlaggedForInvestigation</div>
+            <div class="kpi-label">Flagged for Investigation</div>
+        </div>
+        <div class="kpi-card kpi-critical">
+            <div class="kpi-value text-critical">@s.ExpectedFraudExposureTotalTnd.ToString("N0")</div>
+            <div class="kpi-label">Fraud Exposure (TND)</div>
+        </div>
+        <div class="kpi-card kpi-success">
+            <div class="kpi-value text-success">@s.ExpectedNetSavingsTnd.ToString("N0")</div>
+            <div class="kpi-label">Net Savings (TND)</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-value text-warning">@((s.ExpectedRoi * 100).ToString("F0"))%</div>
+            <div class="kpi-label">Expected ROI</div>
+        </div>
+        <div class="kpi-card kpi-info">
+            <div class="kpi-value text-info">@s.TotalInvestigationHours.ToString("N0")h</div>
+            <div class="kpi-label">Investigation Hours</div>
+        </div>
+    </div>
+
+    <!-- ═══ Charts & Detailed KPIs ═══ -->
+    <div class="grid-2">
+        <div class="panel">
+            <div class="panel-header">&#x1F4CA; Risk Distribution (4-Level)</div>
+            <div class="panel-body">
+                <div class="chart-container">
+                    <canvas id="fraudDoughnut"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">&#x1F50D; Investigation Metrics</div>
+            <div class="panel-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Investigation Load</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--accent);">@((s.InvestigationLoadRate * 100).ToString("F1"))%</div>
+                    </div>
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Avg Ticket (TND)</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--accent);">@s.AvgTicketSizeInQueueTnd.ToString("N0")</div>
+                    </div>
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Precision @@ Top 5%</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--success);">@((s.PrecisionAtTop5Pct * 100).ToString("F1"))%</div>
+                    </div>
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Precision @@ Top 10%</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--success);">@((s.PrecisionAtTop10Pct * 100).ToString("F1"))%</div>
+                    </div>
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Capture @@ Top 10%</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--warning);">@((s.CaptureRateTop10Pct * 100).ToString("F1"))%</div>
+                    </div>
+                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
+                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Mgr. Intervention Rate</div>
+                        <div style="font-size:1.3rem;font-weight:800;color:var(--critical);">@((s.ManagerialInterventionRate * 100).ToString("F1"))%</div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem;">
+                    <div style="font-size:.85rem;margin-bottom:.5rem;display:flex;justify-content:space-between;">
+                        <span><span class="badge-risk badge-critical">Critical</span> @s.CriticalRiskCount</span>
+                        <span><span class="badge-risk badge-high">High</span> @s.HighRiskCount</span>
+                        <span><span class="badge-risk badge-medium">Medium</span> @s.MediumRiskCount</span>
+                        <span><span class="badge-risk badge-low">Low</span> @s.LowRiskCount</span>
+                    </div>
+                    <div class="risk-bar" style="height:36px;">
+                        @{ double fTotal = s.CriticalRiskCount + s.HighRiskCount + s.MediumRiskCount + s.LowRiskCount; }
+                        @if (fTotal > 0)
+                        {
+                            <div class="segment seg-critical" style="flex:@s.CriticalRiskCount;">@s.CriticalRiskCount</div>
+                            <div class="segment seg-high" style="flex:@s.HighRiskCount;">@s.HighRiskCount</div>
+                            <div class="segment seg-medium" style="flex:@s.MediumRiskCount;">@s.MediumRiskCount</div>
+                            <div class="segment seg-low" style="flex:@s.LowRiskCount;">@s.LowRiskCount</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Financial Impact ═══ -->
+    <div class="panel">
+        <div class="panel-header">&#x1F4B0; Financial Impact Analysis</div>
+        <div class="panel-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;text-align:center;">
+                <div>
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--danger);">@s.ExpectedFraudExposureTotalTnd.ToString("N0")</div>
+                    <div style="font-size:.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Fraud Exposure (TND)</div>
+                </div>
+                <div>
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--warning);">@s.ExpectedPreventableLossTnd.ToString("N0")</div>
+                    <div style="font-size:.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Preventable Loss (TND)</div>
+                </div>
+                <div>
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--critical);">@s.ExpectedReviewCostTnd.ToString("N0")</div>
+                    <div style="font-size:.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Review Cost (TND)</div>
+                </div>
+                <div>
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--success);">@s.ExpectedNetSavingsTnd.ToString("N0")</div>
+                    <div style="font-size:.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Net Savings (TND)</div>
+                </div>
+                <div>
+                    <div style="font-size:1.5rem;font-weight:800;color:var(--accent);">@((s.ExpectedRoi * 100).ToString("F0"))%</div>
+                    <div style="font-size:.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">ROI</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ═══ Priority Cases ═══ -->
+@if (Model.TopRiskCases.Any() || Model.CriticalCases.Any())
+{
+    <div class="grid-2">
+        @if (Model.TopRiskCases.Any())
+        {
+            <div class="panel">
+                <div class="panel-header">&#x1F525; Top 20 Highest Risk Claims</div>
+                <div class="panel-body p-0" style="overflow-x:auto;">
+                    <table class="table-bi">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Claim ID</th>
+                                <th>Fraud Prob.</th>
+                                <th>Risk</th>
+                                <th>Action</th>
+                                <th>Est. Hours</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pc in Model.TopRiskCases)
+                            {
+                                <tr>
+                                    <td style="font-weight:800;color:var(--danger);">@pc.PriorityRank</td>
+                                    <td style="font-family:monospace;font-size:.82rem;">@pc.ClaimId</td>
+                                    <td class="text-center" style="font-weight:600;">@(pc.FraudProbability.ToString("P1"))</td>
+                                    <td class="text-center">
+                                        @{
+                                            var trClass = pc.RiskLevel?.ToLower() switch { "critical" => "badge-critical", "high" => "badge-high", "medium" => "badge-medium", _ => "badge-low" };
+                                        }
+                                        <span class="badge-risk @trClass">@pc.RiskLevel</span>
+                                    </td>
+                                    <td style="font-size:.82rem;">@pc.RecommendedAction</td>
+                                    <td class="text-center">@pc.EstimatedInvestigationHours?.ToString("F1")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        @if (Model.CriticalCases.Any())
+        {
+            <div class="panel">
+                <div class="panel-header">&#x26A0;&#xFE0F; Critical Cases to Monitor</div>
+                <div class="panel-body p-0" style="overflow-x:auto;">
+                    <table class="table-bi">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Claim ID</th>
+                                <th>Fraud Prob.</th>
+                                <th>Risk</th>
+                                <th>Action</th>
+                                <th>Est. Cost (TND)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pc in Model.CriticalCases)
+                            {
+                                <tr>
+                                    <td style="font-weight:800;color:var(--critical);">@pc.PriorityRank</td>
+                                    <td style="font-family:monospace;font-size:.82rem;">@pc.ClaimId</td>
+                                    <td class="text-center" style="font-weight:600;">@(pc.FraudProbability.ToString("P1"))</td>
+                                    <td class="text-center">
+                                        @{
+                                            var crClass = pc.RiskLevel?.ToLower() switch { "critical" => "badge-critical", "high" => "badge-high", "medium" => "badge-medium", _ => "badge-low" };
+                                        }
+                                        <span class="badge-risk @crClass">@pc.RiskLevel</span>
+                                    </td>
+                                    <td style="font-size:.82rem;">@pc.RecommendedAction</td>
+                                    <td class="text-right">@pc.EstimatedInvestigationCostTnd?.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- ═══ Filters ═══ -->
+<form method="get" class="filter-bar">
+    <div class="form-group">
+        <label>Prediction Run</label>
+        <select name="runId">
+            @foreach (var run in Model.AvailableRunIds)
+            {
+                <option value="@run" selected="@(run == Model.SelectedRunId)">@run</option>
+            }
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Risk Level</label>
+        <select name="riskLevel">
+            <option value="">All</option>
+            <option value="Critical" selected="@("Critical" == Model.SelectedRiskLevel)">Critical</option>
+            <option value="High" selected="@("High" == Model.SelectedRiskLevel)">High</option>
+            <option value="Medium" selected="@("Medium" == Model.SelectedRiskLevel)">Medium</option>
+            <option value="Low" selected="@("Low" == Model.SelectedRiskLevel)">Low</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Claim ID</label>
+        <input type="text" name="claimId" value="@Model.SearchClaimId" placeholder="Search..." />
+    </div>
+    <div class="form-group" style="justify-content:end;">
+        <label>&nbsp;</label>
+        <label style="font-size:.85rem;text-transform:none;font-weight:500;cursor:pointer;">
+            <input type="checkbox" name="flaggedOnly" value="true" @(Model.FlaggedOnly ? "checked" : "") style="margin-right:.3rem;" />
+            Flagged only
+        </label>
+    </div>
+    <button type="submit" class="btn-apply">Apply Filters</button>
+</form>
+
+<!-- ═══ All Predictions Table ═══ -->
+<div class="panel">
+    <div class="panel-header">
+        &#x1F4CB; All Fraud Predictions
+        <span style="margin-left:auto;font-weight:400;font-size:.82rem;color:var(--text-muted);">
+            Showing @((Model.PageNumber - 1) * Model.PageSize + 1)&ndash;@(Math.Min(Model.PageNumber * Model.PageSize, Model.TotalCount))
+            of @Model.TotalCount claims
+        </span>
+    </div>
+    <div class="panel-body p-0" style="overflow-x:auto;">
+        <table class="table-bi">
+            <thead>
+                <tr>
+                    <th>Claim ID</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Fraud Prob.</th>
+                    <th>Risk</th>
+                    <th>Flagged?</th>
+                    <th>Intervention</th>
+                    <th>Action</th>
+                    <th>Exposure (TND)</th>
+                    <th>Savings (TND)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Claims)
+                {
+                    <tr>
+                        <td style="font-family:monospace;font-size:.82rem;">@c.ClaimId</td>
+                        <td>@c.StatutSinistreClaim</td>
+                        <td>@c.TypeSinistreClaim</td>
+                        <td>
+                            @{
+                                var sevClass = c.ClaimSeverityBucket?.ToLower() switch { "high" => "high", "medium" => "med", _ => "low" };
+                            }
+                            <span class="badge-severity @sevClass">@c.ClaimSeverityBucket</span>
+                        </td>
+                        <td class="text-center" style="font-weight:600;">@(c.FraudProbability.ToString("P1"))</td>
+                        <td class="text-center">
+                            @{
+                                var riskClass = c.RiskLevel?.ToLower() switch { "critical" => "badge-critical", "high" => "badge-high", "medium" => "badge-medium", _ => "badge-low" };
+                            }
+                            <span class="badge-risk @riskClass">@c.RiskLevel</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge-risk @(c.PredictedFraud == 1 ? "badge-yes" : "badge-no")">@(c.PredictedFraud == 1 ? "Yes" : "No")</span>
+                        </td>
+                        <td class="text-center">
+                            @if (c.ManagerialInterventionRequired == 1)
+                            {
+                                <span class="badge-risk badge-critical">Required</span>
+                            }
+                            else
+                            {
+                                <span class="badge-risk badge-no">No</span>
+                            }
+                        </td>
+                        <td style="font-size:.82rem;">@c.RecommendedAction</td>
+                        <td class="text-right">@(c.ExpectedFraudExposureClaimTnd?.ToString("N0") ?? "—")</td>
+                        <td class="text-right">@(c.ExpectedPreventableLossClaimTnd?.ToString("N0") ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ═══ Pagination ═══ -->
+@if (Model.TotalPages > 1)
+{
+    <div class="pagination-bar">
+        <span>Page @Model.PageNumber of @Model.TotalPages</span>
+        <div>
+            @if (Model.HasPreviousPage)
+            {
+                <a asp-action="Index" asp-route-runId="@Model.SelectedRunId" asp-route-riskLevel="@Model.SelectedRiskLevel"
+                   asp-route-claimId="@Model.SearchClaimId" asp-route-flaggedOnly="@Model.FlaggedOnly"
+                   asp-route-page="@(Model.PageNumber - 1)">&laquo; Previous</a>
+            }
+            else
+            {
+                <span class="disabled">&laquo; Previous</span>
+            }
+
+            @for (int i = Math.Max(1, Model.PageNumber - 2); i <= Math.Min(Model.TotalPages, Model.PageNumber + 2); i++)
+            {
+                if (i == Model.PageNumber)
+                {
+                    <strong style="padding:.3rem .65rem;">@i</strong>
+                }
+                else
+                {
+                    <a asp-action="Index" asp-route-runId="@Model.SelectedRunId" asp-route-riskLevel="@Model.SelectedRiskLevel"
+                       asp-route-claimId="@Model.SearchClaimId" asp-route-flaggedOnly="@Model.FlaggedOnly"
+                       asp-route-page="@i">@i</a>
+                }
+            }
+
+            @if (Model.HasNextPage)
+            {
+                <a asp-action="Index" asp-route-runId="@Model.SelectedRunId" asp-route-riskLevel="@Model.SelectedRiskLevel"
+                   asp-route-claimId="@Model.SearchClaimId" asp-route-flaggedOnly="@Model.FlaggedOnly"
+                   asp-route-page="@(Model.PageNumber + 1)">Next &raquo;</a>
+            }
+            else
+            {
+                <span class="disabled">Next &raquo;</span>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Summary != null)
+    {
+        var s = Model.Summary;
+        <script>
+            (function () {
+                new Chart(document.getElementById('fraudDoughnut').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Critical', 'High', 'Medium', 'Low'],
+                        datasets: [{
+                            data: [@s.CriticalRiskCount, @s.HighRiskCount, @s.MediumRiskCount, @s.LowRiskCount],
+                            backgroundColor: ['#7c3aed', '#ef4444', '#f59e0b', '#10b981'],
+                            borderWidth: 0,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } }
+                        }
+                    }
+                });
+            })();
+        </script>
+    }
+}

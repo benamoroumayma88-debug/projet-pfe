@@ -1,0 +1,213 @@
+﻿@model InsuranceWeb.Models.HomeOverviewViewModel
+@{
+    ViewData["Title"] = "Overview";
+}
+
+<div class="page-header">
+    <h1>Claims Intelligence Overview</h1>
+    <p class="subtitle">Real-time summary across all ML models</p>
+</div>
+
+@if (!Model.HasDelay && !Model.HasCost && !Model.HasFraud && !Model.HasForecast)
+{
+    <div class="panel">
+        <div class="panel-body" style="text-align:center;padding:3rem;">
+            <p style="font-size:1.1rem;color:var(--text-muted);">No prediction data available. Run the Python ML pipeline first.</p>
+        </div>
+    </div>
+}
+else
+{
+    <!-- ═══ 4-Model Overview Cards ═══ -->
+    <div class="grid-2" style="margin-bottom:1.5rem;">
+
+        <!-- DELAY -->
+        <div class="model-overview-card" style="border-top:4px solid var(--accent);">
+            <div class="card-icon">&#x23F1;&#xFE0F;</div>
+            <h3>Delay Predictions</h3>
+            @if (Model.HasDelay)
+            {
+                var d = Model.DelaySummary!;
+                <div class="mini-kpi"><span>Claims Scored</span><strong>@d.TotalActiveClaims.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Predicted Delayed</span><strong style="color:var(--danger);">@d.PredictedDelayedCount</strong></div>
+                <div class="mini-kpi"><span>High Risk</span><strong style="color:var(--warning);">@d.HighRiskCount</strong></div>
+                <div class="mini-kpi"><span>Avg Delay Days</span><strong>@d.AvgDelayDaysPerClaim.ToString("F1")</strong></div>
+                <div class="mini-kpi"><span>Cost Impact (TND)</span><strong>@d.EstimatedCostImpactTnd.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Recommended Staff</span><strong style="color:var(--info);">@d.RecommendedStaff</strong></div>
+                <div style="margin-top:.75rem;">
+                    <div class="risk-bar">
+                        @{ double dTotal = d.HighRiskCount + d.MediumRiskCount + d.LowRiskCount; }
+                        @if (dTotal > 0)
+                        {
+                            <div class="segment seg-high" style="flex:@d.HighRiskCount;">@d.HighRiskCount</div>
+                            <div class="segment seg-medium" style="flex:@d.MediumRiskCount;">@d.MediumRiskCount</div>
+                            <div class="segment seg-low" style="flex:@d.LowRiskCount;">@d.LowRiskCount</div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p style="color:var(--text-muted);font-size:.88rem;">No delay data available</p>
+            }
+            <div class="card-footer-link">
+                <a asp-controller="DelayPredictions" asp-action="Index">View Delay Dashboard &rarr;</a>
+            </div>
+        </div>
+
+        <!-- COST -->
+        <div class="model-overview-card" style="border-top:4px solid var(--success);">
+            <div class="card-icon">&#x1F4B0;</div>
+            <h3>Cost Predictions</h3>
+            @if (Model.HasCost)
+            {
+                var c = Model.CostSummary!;
+                <div class="mini-kpi"><span>Active Claims</span><strong>@c.TotalActiveClaims.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Total Predicted Cost</span><strong style="color:var(--danger);">@c.TotalPredictedCost.ToString("N0") TND</strong></div>
+                <div class="mini-kpi"><span>Avg Cost/Claim</span><strong>@c.AverageCostPerClaim.ToString("N0") TND</strong></div>
+                <div class="mini-kpi"><span>High Cost Rate</span><strong style="color:var(--warning);">@((c.HighCostRate * 100).ToString("F1"))%</strong></div>
+                <div class="mini-kpi"><span>Budget Deviation Risk</span><strong>@((c.BudgetDeviationRisk * 100).ToString("F1"))%</strong></div>
+            }
+            else
+            {
+                <p style="color:var(--text-muted);font-size:.88rem;">No cost data available</p>
+            }
+            <div class="card-footer-link">
+                <a asp-controller="CostPredictions" asp-action="Index">View Cost Dashboard &rarr;</a>
+            </div>
+        </div>
+
+        <!-- FRAUD -->
+        <div class="model-overview-card" style="border-top:4px solid var(--critical);">
+            <div class="card-icon">&#x1F6A8;</div>
+            <h3>Fraud Detection</h3>
+            @if (Model.HasFraud)
+            {
+                var f = Model.FraudSummary!;
+                <div class="mini-kpi"><span>Claims Scored</span><strong>@f.TotalScoredClaims.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Flagged for Investigation</span><strong style="color:var(--danger);">@f.FlaggedForInvestigation</strong></div>
+                <div class="mini-kpi"><span>Investigation Load</span><strong>@((f.InvestigationLoadRate * 100).ToString("F1"))%</strong></div>
+                <div class="mini-kpi"><span>Fraud Exposure (TND)</span><strong style="color:var(--critical);">@f.ExpectedFraudExposureTotalTnd.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Net Savings (TND)</span><strong style="color:var(--success);">@f.ExpectedNetSavingsTnd.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>ROI</span><strong>@((f.ExpectedRoi * 100).ToString("F0"))%</strong></div>
+                <div style="margin-top:.75rem;">
+                    <div class="risk-bar">
+                        @{ double fTotal = f.CriticalRiskCount + f.HighRiskCount + f.MediumRiskCount + f.LowRiskCount; }
+                        @if (fTotal > 0)
+                        {
+                            <div class="segment seg-critical" style="flex:@f.CriticalRiskCount;">@f.CriticalRiskCount</div>
+                            <div class="segment seg-high" style="flex:@f.HighRiskCount;">@f.HighRiskCount</div>
+                            <div class="segment seg-medium" style="flex:@f.MediumRiskCount;">@f.MediumRiskCount</div>
+                            <div class="segment seg-low" style="flex:@f.LowRiskCount;">@f.LowRiskCount</div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p style="color:var(--text-muted);font-size:.88rem;">No fraud data available</p>
+            }
+            <div class="card-footer-link">
+                <a asp-controller="FraudPredictions" asp-action="Index">View Fraud Dashboard &rarr;</a>
+            </div>
+        </div>
+
+        <!-- FORECAST -->
+        <div class="model-overview-card" style="border-top:4px solid var(--warning);">
+            <div class="card-icon">&#x1F4C8;</div>
+            <h3>Forecast & Planning</h3>
+            @if (Model.HasForecast)
+            {
+                var fc = Model.ForecastSummary!;
+                <div class="mini-kpi"><span>Forecast Period</span><strong>@fc.TotalForecastPeriod</strong></div>
+                <div class="mini-kpi"><span>Expected Claims</span><strong>@fc.TotalExpectedClaims.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Expected Cost (TND)</span><strong style="color:var(--danger);">@fc.TotalExpectedCostTnd.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Savings Potential (TND)</span><strong style="color:var(--success);">@fc.TotalNetSavingsPotentialTnd.ToString("N0")</strong></div>
+                <div class="mini-kpi"><span>Total Alerts</span><strong style="color:var(--warning);">@fc.TotalAlerts (@fc.CriticalAlerts critical)</strong></div>
+                <div class="mini-kpi"><span>Peak Volume</span><strong>@fc.PeakVolumeMonth (@fc.PeakVolumeClaims.ToString("N0"))</strong></div>
+            }
+            else
+            {
+                <p style="color:var(--text-muted);font-size:.88rem;">No forecast data available</p>
+            }
+            <div class="card-footer-link">
+                <a asp-controller="Forecast" asp-action="Index">View Forecast Dashboard &rarr;</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Forecast Trend Chart ═══ -->
+    @if (Model.HasForecast && Model.ForecastMonths.Any())
+    {
+        <div class="panel">
+            <div class="panel-header">&#x1F4C8; 6-Month Claims Volume & Cost Forecast</div>
+            <div class="panel-body">
+                <div class="chart-container-lg">
+                    <canvas id="forecastTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@section Scripts {
+    @if (Model.HasForecast && Model.ForecastMonths.Any())
+    {
+        <script>
+            (function () {
+                const labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ForecastMonths.Select(m => m.Period).ToArray()));
+                const volumes = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ForecastMonths.Select(m => m.ForecastClaimVolume).ToArray()));
+                const costs = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ForecastMonths.Select(m => m.ForecastTotalIndemnisationTnd).ToArray()));
+                const ctx = document.getElementById('forecastTrendChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Claim Volume',
+                                data: volumes,
+                                backgroundColor: 'rgba(59,130,246,.7)',
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Total Cost (TND)',
+                                data: costs,
+                                type: 'line',
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239,68,68,.1)',
+                                tension: .3,
+                                fill: true,
+                                pointRadius: 5,
+                                pointBackgroundColor: '#ef4444',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (ctx) {
+                                        let val = ctx.parsed.y;
+                                        if (ctx.dataset.yAxisID === 'y1') return ctx.dataset.label + ': ' + val.toLocaleString() + ' TND';
+                                        return ctx.dataset.label + ': ' + val.toLocaleString();
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { position: 'left', title: { display: true, text: 'Claim Volume' }, beginAtZero: true },
+                            y1: { position: 'right', title: { display: true, text: 'Cost (TND)' }, grid: { drawOnChartArea: false }, beginAtZero: true }
+                        }
+                    }
+                });
+            })();
+        </script>
+    }
+}

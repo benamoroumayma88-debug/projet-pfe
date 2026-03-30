@@ -1,0 +1,141 @@
+@model List<InsuranceWeb.Models.User>
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var roles = ViewBag.Roles as List<InsuranceWeb.Models.Role> ?? new();
+}
+
+<div class="page-wrapper">
+    <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>&#x1F6E0;&#xFE0F; Admin Dashboard</h1>
+                <p class="subtitle">Manage users, roles, and account settings</p>
+            </div>
+            <a asp-action="CreateUser" class="btn-upload">&#x2795; New User</a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert-banner alert-success-banner">
+            <span>&#x2705;</span> @TempData["Success"]
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert-banner alert-error-banner">
+            <span>&#x26A0;&#xFE0F;</span> @TempData["Error"]
+        </div>
+    }
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-value text-primary">@ViewBag.TotalUsers</div>
+            <div class="kpi-label">Total Users</div>
+        </div>
+        <div class="kpi-card kpi-success">
+            <div class="kpi-value text-success">@ViewBag.ActiveUsers</div>
+            <div class="kpi-label">Active</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-value text-danger">@ViewBag.InactiveUsers</div>
+            <div class="kpi-label">Inactive</div>
+        </div>
+        <div class="kpi-card kpi-info">
+            <div class="kpi-value text-info">@roles.Count</div>
+            <div class="kpi-label">Roles</div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Users Table -->
+        <div class="panel" style="grid-column: 1 / -1;">
+            <div class="panel-header">&#x1F465; Users</div>
+            <div class="panel-body p-0">
+                <div style="overflow-x: auto;">
+                    <table class="table-bi">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Login</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in Model)
+                            {
+                                <tr>
+                                    <td>@user.UserId</td>
+                                    <td><strong>@user.Username</strong></td>
+                                    <td><code>@user.Login</code></td>
+                                    <td>@user.Email</td>
+                                    <td>
+                                        <span class="role-badge role-@user.Role?.RoleName?.ToLower().Replace(" ", "-")">
+                                            @(user.Role?.RoleName ?? "No Role")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (user.IsActive)
+                                        {
+                                            <span class="badge-risk badge-low">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-risk badge-medium">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        <div style="display: flex; gap: .4rem;">
+                                            <a asp-action="EditUser" asp-route-id="@user.UserId"
+                                               class="btn-action btn-edit" title="Edit">&#x270F;&#xFE0F;</a>
+                                            <form method="post" asp-action="ToggleActive" asp-route-id="@user.UserId"
+                                                  style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn-action @(user.IsActive ? "btn-deactivate" : "btn-activate")"
+                                                        title="@(user.IsActive ? "Deactivate" : "Activate")">
+                                                    @(user.IsActive ? "🔒" : "🔓")
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roles & Permissions -->
+    <div class="panel" style="margin-top: .5rem;">
+        <div class="panel-header">&#x1F511; Roles & Permissions</div>
+        <div class="panel-body">
+            <div class="roles-grid">
+                @foreach (var role in roles)
+                {
+                    <div class="role-card">
+                        <h4>@role.RoleName</h4>
+                        <p class="text-muted-sm">@role.Description</p>
+                        <div class="permission-tags">
+                            @if (role.Permissions != null)
+                            {
+                                @foreach (var rp in role.Permissions.Where(p => p.Permission != null))
+                                {
+                                    <span class="column-tag">@rp.Permission!.PermissionName</span>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

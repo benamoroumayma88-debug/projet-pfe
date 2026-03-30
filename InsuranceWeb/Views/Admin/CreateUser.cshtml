@@ -1,0 +1,63 @@
+@{
+    ViewData["Title"] = "Create User";
+    var roles = ViewBag.Roles as List<InsuranceWeb.Models.Role> ?? new();
+}
+
+<div class="page-wrapper">
+    <div class="page-header">
+        <h1>&#x2795; Create New User</h1>
+        <p class="subtitle">Add a new user to the platform</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ViewBag.Error as string))
+    {
+        <div class="alert-banner alert-error-banner">
+            <span>&#x26A0;&#xFE0F;</span> @ViewBag.Error
+        </div>
+    }
+
+    <div class="panel" style="max-width: 600px;">
+        <div class="panel-header">&#x1F464; User Details</div>
+        <div class="panel-body">
+            <form method="post" asp-action="CreateUser">
+                @Html.AntiForgeryToken()
+
+                <div class="form-group-upload">
+                    <label>Username</label>
+                    <input type="text" name="username" class="form-control-upload" required placeholder="Full name" />
+                </div>
+
+                <div class="form-group-upload" style="margin-top: .75rem;">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control-upload" required placeholder="user@company.com" />
+                </div>
+
+                <div class="form-group-upload" style="margin-top: .75rem;">
+                    <label>Login</label>
+                    <input type="text" name="login" class="form-control-upload" required placeholder="Login identifier" />
+                </div>
+
+                <div class="form-group-upload" style="margin-top: .75rem;">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control-upload" required minlength="6" placeholder="Minimum 6 characters" />
+                </div>
+
+                <div class="form-group-upload" style="margin-top: .75rem;">
+                    <label>Role</label>
+                    <select name="roleId" class="form-control-upload" required>
+                        <option value="">-- Select Role --</option>
+                        @foreach (var role in roles)
+                        {
+                            <option value="@role.RoleId">@role.RoleName — @role.Description</option>
+                        }
+                    </select>
+                </div>
+
+                <div style="margin-top: 1.25rem; display: flex; gap: .75rem;">
+                    <button type="submit" class="btn-upload">&#x2705; Create User</button>
+                    <a asp-action="Index" class="btn-upload" style="background: var(--text-muted);">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

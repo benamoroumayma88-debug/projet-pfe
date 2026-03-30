@@ -1,0 +1,171 @@
+@{
+    ViewData["Title"] = "Data Upload";
+    var tables = ViewBag.Tables as List<string> ?? new List<string>();
+    var expectedColumns = ViewBag.ExpectedColumns as string[];
+}
+
+<div class="page-wrapper">
+    <div class="page-header">
+        <h1>&#x1F4C1; Data Upload</h1>
+        <p class="subtitle">Upload CSV files to load data into the database tables</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ViewBag.Success as string))
+    {
+        <div class="alert-banner alert-success-banner">
+            <span>&#x2705;</span> @ViewBag.Success
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(ViewBag.Error as string))
+    {
+        <div class="alert-banner alert-error-banner">
+            <span>&#x26A0;&#xFE0F;</span> @ViewBag.Error
+        </div>
+        @if (expectedColumns != null)
+        {
+            <div class="panel" style="margin-bottom: 1.25rem;">
+                <div class="panel-header">Expected Columns</div>
+                <div class="panel-body">
+                    <code style="font-size: .82rem; word-break: break-all;">@string.Join(", ", expectedColumns)</code>
+                </div>
+            </div>
+        }
+    }
+
+    <div class="grid-2">
+        <!-- Upload Form -->
+        <div class="panel">
+            <div class="panel-header">&#x1F4E4; Upload CSV File</div>
+            <div class="panel-body">
+                <form method="post" asp-action="Upload" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <div class="form-group-upload">
+                        <label for="targetTable">Target Table</label>
+                        <select name="targetTable" id="targetTable" class="form-control-upload" required>
+                            <option value="">-- Select a table --</option>
+                            @foreach (var table in tables)
+                            {
+                                <option value="@table">@table</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-group-upload" style="margin-top: 1rem;">
+                        <label for="csvFile">CSV File</label>
+                        <div class="file-drop-zone" id="dropZone">
+                            <input type="file" name="csvFile" id="csvFile" accept=".csv" required
+                                   style="display:none;" />
+                            <div class="drop-content">
+                                <span style="font-size: 2.5rem;">&#x1F4C4;</span>
+                                <p><strong>Drag & drop your CSV file here</strong></p>
+                                <p class="text-muted-sm">or <a href="#" id="browseLink">browse</a> to select a file</p>
+                                <p class="file-name-display" id="fileName"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-upload" style="margin-top: 1.25rem;">
+                        &#x1F680; Upload & Import
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Info -->
+        <div class="panel">
+            <div class="panel-header">&#x1F4CB; Table Schema</div>
+            <div class="panel-body">
+                <p class="text-muted-sm" id="schemaPlaceholder">Select a table to view its expected columns.</p>
+                <div id="schemaInfo" style="display:none;">
+                    <p style="font-size: .85rem; margin-bottom: .75rem;">
+                        Your CSV must include these column headers for <strong id="schemaTableName"></strong>:
+                    </p>
+                    <div class="column-list" id="columnList"></div>
+                </div>
+            </div>
+
+            <div class="panel-header" style="border-top: 1px solid var(--border);">&#x2139;&#xFE0F; Upload Guidelines</div>
+            <div class="panel-body">
+                <ul class="guidelines-list">
+                    <li>File must be <strong>.csv</strong> format (comma or semicolon separated)</li>
+                    <li>First row must contain column headers</li>
+                    <li>Column names must match the table schema exactly</li>
+                    <li>Maximum file size: <strong>50 MB</strong></li>
+                    <li>Empty values will be stored as NULL</li>
+                    <li>All rows are inserted in a single transaction</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Drag and drop
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('csvFile');
+    const fileName = document.getElementById('fileName');
+    const browseLink = document.getElementById('browseLink');
+
+    browseLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            showFileName(e.dataTransfer.files[0].name);
+        }
+    });
+
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+            showFileName(fileInput.files[0].name);
+        }
+    });
+
+    function showFileName(name) {
+        fileName.textContent = name;
+        fileName.style.display = 'block';
+        dropZone.classList.add('has-file');
+    }
+
+    // Schema display
+    const tableSelect = document.getElementById('targetTable');
+    tableSelect.addEventListener('change', function() {
+        const table = this.value;
+        if (!table) {
+            document.getElementById('schemaPlaceholder').style.display = '';
+            document.getElementById('schemaInfo').style.display = 'none';
+            return;
+        }
+        fetch('@Url.Action("GetTableColumns", "DataUpload")?table=' + encodeURIComponent(table))
+            .then(r => r.json())
+            .then(cols => {
+                document.getElementById('schemaPlaceholder').style.display = 'none';
+                document.getElementById('schemaInfo').style.display = '';
+                document.getElementById('schemaTableName').textContent = table;
+                const list = document.getElementById('columnList');
+                list.innerHTML = cols.map(c => '<span class="column-tag">' + c + '</span>').join('');
+            });
+    });
+</script>
+}
