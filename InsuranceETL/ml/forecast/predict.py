@@ -78,9 +78,9 @@ _SEASONAL_NOTE: Dict[int, str] = {
     3:  "Pre-summer preparation: Activity starts rising",
     4:  "Spring traffic surge: Road accidents increase",
     5:  "May public holidays: Traffic spike risk",
-    6:  "Summer begins: Student drivers, vacation travel → surge",
-    7:  "Peak summer: Maximum vehicle usage – highest risk month",
-    8:  "Vacation peak: Cross-country travel → high claim risk",
+    6:  "Summer begins: Student drivers, vacation travel -> surge",
+    7:  "Peak summer: Maximum vehicle usage - highest risk month",
+    8:  "Vacation peak: Cross-country travel -> high claim risk",
     9:  "Back-to-school: New young drivers, accident risk elevated",
     10: "Autumn rains begin: Road condition deterioration",
     11: "Rain season: Accident risk intensifies",
@@ -112,11 +112,11 @@ def load_models() -> Dict[str, Any]:
             order    = bundle["meta"]["order"]
             seasonal = bundle["meta"]["seasonal_order"]
             mape     = bundle["meta"].get("metrics", {}).get("mape_pct", "N/A")
-            print(f"  [LOAD] {kpi:25s}  ARIMA{order}×{seasonal}  MAPE={mape}")
+            print(f"  [LOAD] {kpi:25s}  ARIMA{order}x{seasonal}  MAPE={mape}")
         else:
             print(f"  [MISSING] {kpi}: model file not found")
 
-    print(f"  └── {len(models) - 1} model(s) loaded\n")
+    print(f"  +-- {len(models) - 1} model(s) loaded\n")
     return models
 
 
@@ -173,7 +173,7 @@ def generate_forecasts(models: Dict, horizon: int) -> pd.DataFrame:
         last_date + pd.offsets.MonthBegin(1), periods=horizon, freq="MS"
     )
     print(
-        f"[FORECAST] Horizon: {forecast_dates[0].strftime('%Y-%m')} → "
+        f"[FORECAST] Horizon: {forecast_dates[0].strftime('%Y-%m')} -> "
         f"{forecast_dates[-1].strftime('%Y-%m')}\n"
     )
 
@@ -204,7 +204,7 @@ def generate_forecasts(models: Dict, horizon: int) -> pd.DataFrame:
                 fc_values = np.clip(fc_values, 0.0, None)
 
             point_forecasts[kpi] = fc_values
-            print(f"  {kpi:25s} range [{fc_values.min():.2f} – {fc_values.max():.2f}]")
+            print(f"  {kpi:25s} range [{fc_values.min():.2f} - {fc_values.max():.2f}]")
 
         except Exception as exc:
             print(f"  {kpi:25s} ERROR: {exc}")
@@ -377,11 +377,11 @@ def compute_business_kpis(
             )
         if workload_index > 0.85:
             recommendations.append(
-                f"Agent workload at {workload_index*100:.0f}% capacity – consider temporary staffing."
+                f"Agent workload at {workload_index*100:.0f}% capacity - consider temporary staffing."
             )
         if budget_variance_pct < -10:
             recommendations.append(
-                "Claims activity lower than average – opportunity to accelerate pending backlog."
+                "Claims activity lower than average - opportunity to accelerate pending backlog."
             )
 
         monthly_kpis.append({
@@ -452,7 +452,7 @@ def compute_portfolio_summary(monthly_kpis: List[Dict]) -> Dict:
 
     return {
         "horizon_months":                 len(monthly_kpis),
-        "total_forecast_period":          f"{monthly_kpis[0]['period']} → {monthly_kpis[-1]['period']}",
+        "total_forecast_period":          f"{monthly_kpis[0]['period']} -> {monthly_kpis[-1]['period']}",
         "total_expected_claims":          round(total_volume),
         "total_expected_cost_tnd":        round(total_cost, 2),
         "avg_monthly_delay_rate_pct":     round(avg_delay_rate, 1),
@@ -491,7 +491,7 @@ def _build_strategic_insight(
     parts: List[str] = []
     if surge_months:
         parts.append(
-            f"Volume surges forecast in {', '.join(surge_months)} – proactive staffing strongly recommended."
+            f"Volume surges forecast in {', '.join(surge_months)} - proactive staffing strongly recommended."
         )
     if high_risk_months:
         parts.append(
@@ -507,7 +507,7 @@ def _build_strategic_insight(
         )
     if savings > 30_000:
         parts.append(
-            f"Proactive interventions could prevent up to {int(savings / 1_000)}K TND in losses over 6 months – ROI positive."
+            f"Proactive interventions could prevent up to {int(savings / 1_000)}K TND in losses over 6 months - ROI positive."
         )
     if not parts:
         parts.append(
@@ -521,11 +521,11 @@ def _build_strategic_insight(
 # ─────────────────────────────────────────────────────────
 def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
     W = 80
-    print("\n" + "═" * W)
-    print("  INSURANCE CLAIMS – 6-MONTH STRATEGIC FORECAST REPORT")
+    print("\n" + "=" * W)
+    print("  INSURANCE CLAIMS - 6-MONTH STRATEGIC FORECAST REPORT")
     print(f"  Period : {summary.get('total_forecast_period', '')}")
     print(f"  Run at : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print("═" * W)
+    print("=" * W)
 
     # Monthly table
     header = (
@@ -533,11 +533,11 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         f"{'Delay%':>8} {'Fraud%':>7} {'Agents':>7} {'Savings(KTND)':>14} {'Risk':<10}"
     )
     print("\n" + header)
-    print("─" * W)
+    print("-" * W)
     for m in monthly_kpis:
         f  = m["forecast"]
         b  = m["business_kpis"]
-        surge_flag = " ▲" if m["is_surge_month"] else "  "
+        surge_flag = " ^" if m["is_surge_month"] else "  "
         print(
             f"{m['month']:<18} {f['claim_volume']:>7.0f} {f['total_indemnisation_tnd']/1_000:>11.1f} "
             f"{f['delay_rate_pct']:>8.1f} {f['fraud_rate_pct']:>7.2f} "
@@ -545,7 +545,7 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
             f"{m['risk_level']:<8}{surge_flag}"
         )
 
-    print("─" * W)
+    print("-" * W)
     print(f"  {'TOTAL / AVG':<16} {summary['total_expected_claims']:>7.0f} "
           f"{summary['total_expected_cost_tnd']/1_000:>11.1f} "
           f"{summary['avg_monthly_delay_rate_pct']:>8.1f} "
@@ -554,9 +554,9 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
           f"{summary['total_net_savings_potential_tnd']/1_000:>14.1f}")
 
     # KPI highlights
-    print("\n" + "─" * W)
+    print("\n" + "-" * W)
     print("  KEY PERFORMANCE INDICATORS (6-MONTH CUMULATIVE)")
-    print("─" * W)
+    print("-" * W)
     kpis = [
         ("Total Expected Claims",            f"{summary['total_expected_claims']:,.0f}"),
         ("Total Expected Cost",              f"{summary['total_expected_cost_tnd']/1_000:,.1f} K TND"),
@@ -573,9 +573,9 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         print(f"  {label:<35} {value}")
 
     # Alerts
-    print("\n" + "─" * W)
+    print("\n" + "-" * W)
     print("  AUTOMATED ALERTS")
-    print("─" * W)
+    print("-" * W)
     has_alerts = False
     for m in monthly_kpis:
         for alert in m["alerts"]:
@@ -585,14 +585,14 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         print("  No alerts for the forecast horizon.")
 
     # Strategic insight
-    print("\n" + "─" * W)
+    print("\n" + "-" * W)
     print("  STRATEGIC INSIGHT FOR MANAGEMENT")
-    print("─" * W)
+    print("-" * W)
     for sentence in summary.get("strategic_insight", "").split("  "):
         if sentence.strip():
-            print(f"  • {sentence.strip()}")
+            print(f"  * {sentence.strip()}")
 
-    print("\n" + "═" * W)
+    print("\n" + "=" * W)
 
 
 # ─────────────────────────────────────────────────────────
@@ -663,7 +663,7 @@ def save_dashboard_insights(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(insights, f, indent=2, default=_convert)
 
-    print(f"[SAVE] Dashboard insights → {output_path}")
+    print(f"[SAVE] Dashboard insights -> {output_path}")
     return insights
 
 
@@ -814,7 +814,7 @@ def save_forecast_to_database(insights: Dict[str, Any]) -> None:
 # ─────────────────────────────────────────────────────────
 def main() -> None:
     print("=" * 65)
-    print("  INSURANCE CLAIMS FORECASTING – PREDICTION & KPI REPORT")
+    print("  INSURANCE CLAIMS FORECASTING - PREDICTION & KPI REPORT")
     print("=" * 65 + "\n")
 
     models        = load_models()

@@ -65,5 +65,46 @@ namespace InsuranceWeb.Controllers
 
             return View(vm);
         }
+
+        public async Task<IActionResult> Alerts(string? runId)
+        {
+            var availableRuns = await _db.ClaimForecastSummaries
+                .Select(x => x.ForecastRunId)
+                .Distinct()
+                .OrderByDescending(x => x)
+                .ToListAsync();
+            var runList = availableRuns.Where(r => r != null).Cast<string>().ToList();
+
+            if (string.IsNullOrEmpty(runId) && runList.Any())
+                runId = runList.First();
+
+            ClaimForecastSummary? summary = null;
+            var alerts = new List<ClaimForecastAlert>();
+
+            if (!string.IsNullOrEmpty(runId))
+            {
+                summary = await _db.ClaimForecastSummaries
+                    .Where(x => x.ForecastRunId == runId)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync();
+
+                alerts = await _db.ClaimForecastAlerts
+                    .Where(x => x.ForecastRunId == runId)
+                    .OrderBy(x => x.Period)
+                    .ThenByDescending(x => x.AlertLevel)
+                    .AsNoTracking()
+                    .ToListAsync();
+            }
+
+            var vm = new ForecastDashboardViewModel
+            {
+                Summary = summary,
+                Alerts = alerts,
+                SelectedRunId = runId,
+                AvailableRunIds = runList,
+            };
+
+            return View(vm);
+        }
     }
 }

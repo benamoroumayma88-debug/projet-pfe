@@ -11,6 +11,7 @@ namespace InsuranceWeb.Data
         public DbSet<Role> Roles { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +34,10 @@ namespace InsuranceWeb.Data
 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Login)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.PasswordHash)
                 .IsUnique();
 
             // Configure Role

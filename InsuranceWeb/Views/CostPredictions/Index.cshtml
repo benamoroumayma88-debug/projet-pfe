@@ -125,7 +125,6 @@
                     <th>Claim ID</th>
                     <th>Status</th>
                     <th>Type</th>
-                    <th>Coverage</th>
                     <th>Severity</th>
                     <th>Predicted Cost (TND)</th>
                     <th>Cost Risk</th>
@@ -139,7 +138,6 @@
                         <td style="font-family:monospace;font-size:.82rem;">@c.ClaimId</td>
                         <td>@c.StatutSinistreClaim</td>
                         <td>@c.TypeSinistreClaim</td>
-                        <td>@c.TypeCouverture</td>
                         <td>
                             @{
                                 var sevClass = c.ClaimSeverityBucket?.ToLower() switch { "high" => "high", "medium" => "med", _ => "low" };

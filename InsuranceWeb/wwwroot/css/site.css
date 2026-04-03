@@ -488,6 +488,492 @@ body {
 }
 .btn-action:hover { box-shadow: var(--shadow); }
 .btn-edit:hover { border-color: var(--accent); background: #eff6ff; }
+
+/* ══════════════════════════════════════════════
+   Forecast Alerts Banner (flashy link on Index)
+   ══════════════════════════════════════════════ */
+.forecast-alerts-banner {
+    display: block;
+    position: relative;
+    margin: 1.5rem 0;
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #1e1b4b 100%);
+    text-decoration: none;
+    color: #e0e7ff;
+    overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, .25), 0 0 0 1px rgba(124, 58, 237, .15);
+    cursor: pointer;
+}
+.forecast-alerts-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(124, 58, 237, .35), 0 0 0 1px rgba(124, 58, 237, .3);
+    color: #fff;
+}
+.forecast-alerts-banner:active {
+    transform: translateY(0);
+}
+
+/* Animated glow sweep */
+.fab-glow {
+    position: absolute;
+    top: 0; left: -100%; bottom: 0;
+    width: 200%;
+    background: linear-gradient(90deg, transparent 0%, rgba(139,92,246,.15) 25%, rgba(99,102,241,.25) 50%, rgba(139,92,246,.15) 75%, transparent 100%);
+    animation: fabSweep 3s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes fabSweep {
+    0%   { transform: translateX(-30%); }
+    50%  { transform: translateX(30%); }
+    100% { transform: translateX(-30%); }
+}
+
+.fab-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    z-index: 1;
+}
+
+/* Pulsing icon ring */
+.fab-icon-ring {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(139, 92, 246, .2);
+    border: 2px solid rgba(139, 92, 246, .4);
+    flex-shrink: 0;
+    animation: fabRingPulse 2s ease-in-out infinite;
+}
+@keyframes fabRingPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,.3); }
+    50%      { box-shadow: 0 0 0 8px rgba(139,92,246,0); }
+}
+.fab-icon {
+    font-size: 1.5rem;
+}
+.fab-pulse-dot {
+    position: absolute;
+    top: 2px; right: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 2px solid #1e1b4b;
+    animation: fabDotPulse 1.5s ease-in-out infinite;
+}
+@keyframes fabDotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.3); opacity: .7; }
+}
+
+.fab-text {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    flex: 1;
+    min-width: 0;
+}
+.fab-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: .01em;
+}
+.fab-subtitle {
+    font-size: .82rem;
+    color: #c7d2fe;
+    line-height: 1.3;
+}
+
+.fab-arrow {
+    flex-shrink: 0;
+    color: rgba(199,210,254,.6);
+    transition: transform .2s ease, color .2s ease;
+}
+.forecast-alerts-banner:hover .fab-arrow {
+    transform: translateX(4px);
+    color: #fff;
+}
+
+/* ══════════════════════════════════════════════
+   Forecast Alerts Page
+   ══════════════════════════════════════════════ */
+.btn-back-link {
+    display: inline-block;
+    margin-top: .5rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    transition: color .15s;
+}
+.btn-back-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* Filter bar */
+.alerts-filter-bar {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.alerts-filter-btn {
+    padding: .45rem 1rem;
+    border-radius: 2rem;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-muted);
+    font-size: .82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+}
+.alerts-filter-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.alerts-filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+.alerts-filter-btn.filter-critical.active {
+    background: var(--critical);
+    border-color: var(--critical);
+}
+.alerts-filter-btn.filter-high.active {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+.alerts-filter-btn.filter-medium.active {
+    background: var(--warning);
+    border-color: var(--warning);
+    color: #1e293b;
+}
+
+/* Full alert cards on alerts page */
+.alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+.alert-card-full {
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    border-left: 5px solid;
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    transition: transform .15s, box-shadow .15s;
+}
+.alert-card-full:hover {
+    transform: translateX(4px);
+    box-shadow: var(--shadow-md);
+}
+.alert-card-full.alert-critical {
+    border-color: var(--critical);
+    background: linear-gradient(90deg, #faf5ff 0%, var(--card-bg) 100%);
+}
+.alert-card-full.alert-high {
+    border-color: var(--danger);
+    background: linear-gradient(90deg, #fef2f2 0%, var(--card-bg) 100%);
+}
+.alert-card-full.alert-medium {
+    border-color: var(--warning);
+    background: linear-gradient(90deg, #fffbeb 0%, var(--card-bg) 100%);
+}
+.alert-card-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .5rem;
+    flex-wrap: wrap;
+}
+.alert-icon {
+    font-size: 1.15rem;
+}
+.alert-period {
+    font-weight: 700;
+    font-size: .9rem;
+    color: var(--text);
+}
+.alert-type-tag {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .15rem .5rem;
+    border-radius: .25rem;
+    background: rgba(0,0,0,.06);
+    color: var(--text-muted);
+}
+.alert-card-message {
+    font-size: .87rem;
+    line-height: 1.6;
+    color: var(--text);
+}
+
+/* Strategic Insight panel */
+.insight-panel {
+    margin-top: 1.5rem;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdf4 100%);
+    border: 1px solid rgba(16, 185, 129, .2);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+.insight-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(16, 185, 129, .12);
+}
+.insight-header h3 {
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 700;
+    color: #065f46;
+}
+.insight-icon {
+    font-size: 1.3rem;
+}
+.insight-body {
+    padding: 1rem 1.25rem;
+}
+.insight-body p {
+    margin: 0;
+    font-size: .9rem;
+    line-height: 1.7;
+    color: #064e3b;
+}
+
+/* Stat rows on alerts page */
+.insight-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.insight-stat-row:last-child {
+    border-bottom: none;
+}
+.insight-stat-label {
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+.insight-stat-value {
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* ══════════════════════════════════════════════
+   Audit Log Banner (Admin dashboard)
+   ══════════════════════════════════════════════ */
+.audit-log-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.25rem 0;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #cbd5e1;
+    text-decoration: none;
+    box-shadow: 0 4px 15px rgba(30,41,59,.3);
+    transition: transform .2s, box-shadow .2s;
+    cursor: pointer;
+}
+.audit-log-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(30,41,59,.4);
+    color: #f1f5f9;
+}
+.audit-log-banner.audit-banner-alert {
+    background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 40%, #450a0a 100%);
+    box-shadow: 0 4px 20px rgba(239,68,68,.2), 0 0 0 1px rgba(239,68,68,.15);
+    animation: auditBannerPulse 2s ease-in-out infinite;
+}
+@keyframes auditBannerPulse {
+    0%, 100% { box-shadow: 0 4px 20px rgba(239,68,68,.2), 0 0 0 1px rgba(239,68,68,.15); }
+    50% { box-shadow: 0 4px 30px rgba(239,68,68,.35), 0 0 0 2px rgba(239,68,68,.25); }
+}
+.audit-banner-icon {
+    position: relative;
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+.audit-banner-dot {
+    position: absolute;
+    top: -4px; right: -8px;
+    min-width: 20px; height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: #ef4444;
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #450a0a;
+    animation: dotBounce 1.5s ease-in-out infinite;
+}
+@keyframes dotBounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+.audit-banner-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+.audit-banner-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+}
+.audit-banner-subtitle {
+    font-size: .82rem;
+    color: #94a3b8;
+}
+.audit-banner-alert .audit-banner-subtitle { color: #fca5a5; }
+.audit-banner-arrow {
+    flex-shrink: 0;
+    color: rgba(148,163,184,.5);
+    transition: transform .2s, color .2s;
+}
+.audit-log-banner:hover .audit-banner-arrow {
+    transform: translateX(4px);
+    color: #fff;
+}
+
+/* ══════════════════════════════════════════════
+   Audit Log Page
+   ══════════════════════════════════════════════ */
+.audit-filter-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: .75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.audit-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+.audit-filter-group label {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: .03em;
+}
+.audit-filter-group select {
+    padding: .4rem .75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    font-size: .85rem;
+    color: var(--text);
+    cursor: pointer;
+}
+
+/* Row highlighting */
+.audit-row-error {
+    background: #fef2f2 !important;
+    border-left: 3px solid var(--danger);
+}
+.audit-row-warning {
+    background: #fffbeb !important;
+    border-left: 3px solid var(--warning);
+}
+
+/* Severity badges */
+.audit-severity-badge {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: .25rem;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #fff;
+}
+.audit-badge-error { background: var(--danger); }
+.audit-badge-warning { background: var(--warning); color: #1e293b; }
+.audit-badge-info { background: var(--accent); }
+
+/* Event type tag */
+.audit-event-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+/* Action buttons */
+.audit-actions {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+}
+.audit-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .3rem .6rem;
+    border-radius: .35rem;
+    font-size: .72rem;
+    font-weight: 600;
+    border: 1.5px solid;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all .15s;
+}
+.audit-btn-reset {
+    background: #fef2f2;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+.audit-btn-reset:hover {
+    background: var(--danger);
+    color: #fff;
+}
+.audit-btn-details {
+    background: #eff6ff;
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.audit-btn-details:hover {
+    background: var(--accent);
+    color: #fff;
+}
+.audit-btn-resolve {
+    background: #f0fdf4;
+    border-color: var(--success);
+    color: var(--success);
+}
+.audit-btn-resolve:hover {
+    background: var(--success);
+    color: #fff;
+}
 .btn-deactivate:hover { border-color: var(--warning); background: #fffbeb; }
 .btn-activate:hover { border-color: var(--success); background: #ecfdf5; }
 

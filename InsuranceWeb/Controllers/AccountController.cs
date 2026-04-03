@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
 using InsuranceWeb.Data;
+using InsuranceWeb.Models;
 using InsuranceWeb.Utilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,10 +20,17 @@ namespace InsuranceWeb.Controllers
             _logger = logger;
         }
 
+        private string GetClientIp()
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            // Normalize IPv6 loopback
+            if (ip == "::1") ip = "127.0.0.1";
+            return ip;
+        }
+
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
-            // If user is already authenticated, redirect to home
             if (User.Identity?.IsAuthenticated == true)
             {
                 return RedirectToAction("Index", "Home");
@@ -43,6 +51,8 @@ namespace InsuranceWeb.Controllers
                 return View();
             }
 
+            var clientIp = GetClientIp();
+
             try
             {
                 // Find user by login
@@ -54,7 +64,21 @@ namespace InsuranceWeb.Controllers
 
                 if (user == null)
                 {
-                    _logger.LogWarning($"Login attempt with non-existent user: {login}");
+                    _logger.LogWarning("Login attempt with non-existent user: {Login}", login);
+
+                    // Log failed attempt for unknown user
+                    _authContext.AuditLogs.Add(new AuditLog
+                    {
+                        LoginAttempted = login,
+                        EventType = "LOGIN_FAILED",
+                        IpAddress = clientIp,
+                        Severity = "WARNING",
+                        Message = $"Login attempt with unknown user '{login}'",
+                        ConsecutiveFailures = 1,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _authContext.SaveChangesAsync();
+
                     ModelState.AddModelError("", "Invalid login credentials.");
                     ViewData["ReturnUrl"] = returnUrl;
                     return View();
@@ -63,11 +87,101 @@ namespace InsuranceWeb.Controllers
                 // Verify password
                 if (!PasswordHasher.VerifyPassword(password, user.PasswordHash))
                 {
-                    _logger.LogWarning($"Failed password attempt for user: {login}");
+                    _logger.LogWarning("Failed password attempt for user: {Login}", login);
+
+                    // Count recent consecutive failures for this user
+                    var recentFailures = await _authContext.AuditLogs
+                        .Where(a => a.UserId == user.UserId && a.EventType == "LOGIN_FAILED")
+                        .OrderByDescending(a => a.CreatedAt)
+                        .Take(10)
+                        .ToListAsync();
+
+                    // Count consecutive failures (until last success)
+                    var lastSuccess = await _authContext.AuditLogs
+                        .Where(a => a.UserId == user.UserId && a.EventType == "LOGIN_SUCCESS")
+                        .OrderByDescending(a => a.CreatedAt)
+                        .FirstOrDefaultAsync();
+
+                    var consecutiveCount = lastSuccess != null
+                        ? recentFailures.Count(f => f.CreatedAt > lastSuccess.CreatedAt) + 1
+                        : recentFailures.Count + 1;
+
+                    var severity = consecutiveCount >= 3 ? "ERROR" : "WARNING";
+                    var message = consecutiveCount >= 3
+                        ? $"User '{login}' failed login {consecutiveCount} times in a row — possible brute force"
+                        : $"Failed password attempt for user '{login}'";
+
+                    var auditEntry = new AuditLog
+                    {
+                        UserId = user.UserId,
+                        LoginAttempted = login,
+                        EventType = "LOGIN_FAILED",
+                        IpAddress = clientIp,
+                        Severity = severity,
+                        Message = message,
+                        ConsecutiveFailures = consecutiveCount,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _authContext.AuditLogs.Add(auditEntry);
+
+                    // If 3+ failures, also create an ACCOUNT_LOCKED alert
+                    if (consecutiveCount == 3)
+                    {
+                        _authContext.AuditLogs.Add(new AuditLog
+                        {
+                            UserId = user.UserId,
+                            LoginAttempted = login,
+                            EventType = "ACCOUNT_LOCKED",
+                            IpAddress = clientIp,
+                            Severity = "ERROR",
+                            Message = $"Account '{login}' flagged: {consecutiveCount} consecutive failed login attempts. Password reset recommended.",
+                            ConsecutiveFailures = consecutiveCount,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    await _authContext.SaveChangesAsync();
+
                     ModelState.AddModelError("", "Invalid login credentials.");
                     ViewData["ReturnUrl"] = returnUrl;
                     return View();
                 }
+
+                // --- Login successful ---
+
+                // Check for IP change
+                var lastSuccessLogin = await _authContext.AuditLogs
+                    .Where(a => a.UserId == user.UserId && a.EventType == "LOGIN_SUCCESS")
+                    .OrderByDescending(a => a.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (lastSuccessLogin != null && lastSuccessLogin.IpAddress != clientIp)
+                {
+                    _authContext.AuditLogs.Add(new AuditLog
+                    {
+                        UserId = user.UserId,
+                        LoginAttempted = login,
+                        EventType = "IP_CHANGE",
+                        IpAddress = clientIp,
+                        PreviousIp = lastSuccessLogin.IpAddress,
+                        Severity = "WARNING",
+                        Message = $"User '{login}' logged in from new IP {clientIp} (previous: {lastSuccessLogin.IpAddress})",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                // Log successful login
+                _authContext.AuditLogs.Add(new AuditLog
+                {
+                    UserId = user.UserId,
+                    LoginAttempted = login,
+                    EventType = "LOGIN_SUCCESS",
+                    IpAddress = clientIp,
+                    Severity = "INFO",
+                    Message = $"User '{login}' logged in successfully",
+                    CreatedAt = DateTime.UtcNow
+                });
+                await _authContext.SaveChangesAsync();
 
                 // Create claims for the authenticated user
                 var claims = new List<Claim>

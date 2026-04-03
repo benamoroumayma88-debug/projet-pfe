@@ -4,6 +4,7 @@ using InsuranceWeb.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InsuranceWeb.Migrations.Auth
 {
     [DbContext(typeof(AuthDbContext))]
-    partial class AuthDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260331140953_AddUniquePasswordHash")]
+    partial class AddUniquePasswordHash
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,79 +24,6 @@ namespace InsuranceWeb.Migrations.Auth
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("InsuranceWeb.Models.AuditLog", b =>
-                {
-                    b.Property<int>("LogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("log_id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LogId"));
-
-                    b.Property<int>("ConsecutiveFailures")
-                        .HasColumnType("int")
-                        .HasColumnName("consecutive_failures");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("event_type");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("ip_address");
-
-                    b.Property<bool>("IsResolved")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_resolved");
-
-                    b.Property<string>("LoginAttempted")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("login_attempted");
-
-                    b.Property<string>("Message")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("message");
-
-                    b.Property<string>("PreviousIp")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("previous_ip");
-
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("resolved_at");
-
-                    b.Property<string>("ResolvedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("resolved_by");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasColumnName("severity");
-
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("LogId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("audit_logs");
-                });
 
             modelBuilder.Entity("InsuranceWeb.Models.Permission", b =>
                 {
@@ -142,7 +72,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 1,
                             Action = "View",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2798),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(60),
                             PermissionName = "View Dashboard",
                             Resource = "Dashboard"
                         },
@@ -150,7 +80,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 2,
                             Action = "Report",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2803),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(66),
                             PermissionName = "Generate Reports",
                             Resource = "Dashboard"
                         },
@@ -158,7 +88,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 3,
                             Action = "View",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2804),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(68),
                             PermissionName = "View Delay Predictions",
                             Resource = "DelayPredictions"
                         },
@@ -166,7 +96,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 4,
                             Action = "Modify",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2805),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(69),
                             PermissionName = "Modify Delay Settings",
                             Resource = "DelayPredictions"
                         },
@@ -174,7 +104,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 5,
                             Action = "View",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2806),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(70),
                             PermissionName = "View Cost Predictions",
                             Resource = "CostPredictions"
                         },
@@ -182,7 +112,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 6,
                             Action = "Modify",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2808),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(72),
                             PermissionName = "Modify Cost Settings",
                             Resource = "CostPredictions"
                         },
@@ -190,7 +120,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 7,
                             Action = "View",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2809),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(73),
                             PermissionName = "View Fraud Predictions",
                             Resource = "FraudPredictions"
                         },
@@ -198,7 +128,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 8,
                             Action = "Modify",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2810),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(74),
                             PermissionName = "Modify Fraud Settings",
                             Resource = "FraudPredictions"
                         },
@@ -206,7 +136,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 9,
                             Action = "Investigate",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2811),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(75),
                             PermissionName = "Investigate Fraud",
                             Resource = "FraudPredictions"
                         },
@@ -214,7 +144,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 10,
                             Action = "View",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2813),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(76),
                             PermissionName = "View Forecast",
                             Resource = "Forecast"
                         },
@@ -222,7 +152,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 11,
                             Action = "Modify",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2814),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(77),
                             PermissionName = "Modify Forecast",
                             Resource = "Forecast"
                         },
@@ -230,7 +160,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 12,
                             Action = "ManageUsers",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2815),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(78),
                             PermissionName = "Manage Users",
                             Resource = "Admin"
                         },
@@ -238,7 +168,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 13,
                             Action = "ViewLogs",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2816),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(79),
                             PermissionName = "View Audit Logs",
                             Resource = "Admin"
                         },
@@ -246,7 +176,7 @@ namespace InsuranceWeb.Migrations.Auth
                         {
                             PermissionId = 14,
                             Action = "Upload",
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2817),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(80),
                             PermissionName = "Upload Data",
                             Resource = "DataUpload"
                         });
@@ -287,21 +217,21 @@ namespace InsuranceWeb.Migrations.Auth
                         new
                         {
                             RoleId = 1,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2727),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 541, DateTimeKind.Utc).AddTicks(9973),
                             Description = "Full access to all features, data upload, and reporting",
                             RoleName = "Manager"
                         },
                         new
                         {
                             RoleId = 2,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2730),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 541, DateTimeKind.Utc).AddTicks(9980),
                             Description = "Read-only access to dashboards and reports",
                             RoleName = "Business Analyst"
                         },
                         new
                         {
                             RoleId = 3,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2731),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 541, DateTimeKind.Utc).AddTicks(9981),
                             Description = "User and account management, platform administration",
                             RoleName = "Admin"
                         });
@@ -341,140 +271,140 @@ namespace InsuranceWeb.Migrations.Auth
                         new
                         {
                             RolePermissionId = 1,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2841),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(105),
                             PermissionId = 1,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 2,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2843),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(108),
                             PermissionId = 2,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 3,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2844),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(109),
                             PermissionId = 3,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 4,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2845),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(110),
                             PermissionId = 4,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 5,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2846),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(111),
                             PermissionId = 5,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 6,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2847),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(112),
                             PermissionId = 6,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 7,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2848),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(113),
                             PermissionId = 7,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 8,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2849),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(114),
                             PermissionId = 8,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 9,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2849),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(115),
                             PermissionId = 9,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 10,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2851),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(116),
                             PermissionId = 10,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 11,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2852),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(117),
                             PermissionId = 11,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 12,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2852),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(118),
                             PermissionId = 14,
                             RoleId = 1
                         },
                         new
                         {
                             RolePermissionId = 13,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2853),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(119),
                             PermissionId = 1,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 14,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2854),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(119),
                             PermissionId = 2,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 15,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2855),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(120),
                             PermissionId = 3,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 16,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2855),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(121),
                             PermissionId = 5,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 17,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2856),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(122),
                             PermissionId = 7,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 18,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2857),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(123),
                             PermissionId = 10,
                             RoleId = 2
                         },
                         new
                         {
                             RolePermissionId = 19,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2858),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(124),
                             PermissionId = 12,
                             RoleId = 3
                         },
                         new
                         {
                             RolePermissionId = 20,
-                            CreatedAt = new DateTime(2026, 4, 1, 17, 58, 23, 375, DateTimeKind.Utc).AddTicks(2859),
+                            CreatedAt = new DateTime(2026, 3, 31, 14, 9, 52, 542, DateTimeKind.Utc).AddTicks(125),
                             PermissionId = 13,
                             RoleId = 3
                         });
@@ -545,15 +475,6 @@ namespace InsuranceWeb.Migrations.Auth
                         .IsUnique();
 
                     b.ToTable("users");
-                });
-
-            modelBuilder.Entity("InsuranceWeb.Models.AuditLog", b =>
-                {
-                    b.HasOne("InsuranceWeb.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("InsuranceWeb.Models.RolePermission", b =>

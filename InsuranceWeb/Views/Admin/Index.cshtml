@@ -1,7 +1,6 @@
 @model List<InsuranceWeb.Models.User>
 @{
     ViewData["Title"] = "Admin Dashboard";
-    var roles = ViewBag.Roles as List<InsuranceWeb.Models.Role> ?? new();
 }
 
 <div class="page-wrapper">
@@ -42,11 +41,40 @@
             <div class="kpi-value text-danger">@ViewBag.InactiveUsers</div>
             <div class="kpi-label">Inactive</div>
         </div>
-        <div class="kpi-card kpi-info">
-            <div class="kpi-value text-info">@roles.Count</div>
-            <div class="kpi-label">Roles</div>
-        </div>
     </div>
+
+    <!-- Audit Log Banner -->
+    @{
+        var unresolvedAlerts = (int)(ViewBag.UnresolvedAlerts ?? 0);
+    }
+    <a asp-action="AuditLog" class="audit-log-banner @(unresolvedAlerts > 0 ? "audit-banner-alert" : "")">
+        <div class="audit-banner-icon">
+            &#x1F6E1;&#xFE0F;
+            @if (unresolvedAlerts > 0)
+            {
+                <span class="audit-banner-dot">@unresolvedAlerts</span>
+            }
+        </div>
+        <div class="audit-banner-text">
+            <span class="audit-banner-title">Audit Log</span>
+            <span class="audit-banner-subtitle">
+                @if (unresolvedAlerts > 0)
+                {
+                    <strong style="color:#fca5a5;">@unresolvedAlerts unresolved alert@(unresolvedAlerts != 1 ? "s" : "")</strong>
+                    <span> — View security events &amp; take action &rarr;</span>
+                }
+                else
+                {
+                    <span>No alerts — View login history &amp; security events &rarr;</span>
+                }
+            </span>
+        </div>
+        <div class="audit-banner-arrow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+        </div>
+    </a>
 
     <div class="grid-2">
         <!-- Users Table -->
@@ -110,31 +138,6 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Roles & Permissions -->
-    <div class="panel" style="margin-top: .5rem;">
-        <div class="panel-header">&#x1F511; Roles & Permissions</div>
-        <div class="panel-body">
-            <div class="roles-grid">
-                @foreach (var role in roles)
-                {
-                    <div class="role-card">
-                        <h4>@role.RoleName</h4>
-                        <p class="text-muted-sm">@role.Description</p>
-                        <div class="permission-tags">
-                            @if (role.Permissions != null)
-                            {
-                                @foreach (var rp in role.Permissions.Where(p => p.Permission != null))
-                                {
-                                    <span class="column-tag">@rp.Permission!.PermissionName</span>
-                                }
-                            }
-                        </div>
-                    </div>
-                }
             </div>
         </div>
     </div>

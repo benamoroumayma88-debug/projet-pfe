@@ -37,9 +37,6 @@ namespace InsuranceWeb.Models
         [Column("type_sinistre_claim")]
         public string? TypeSinistreClaim { get; set; }
 
-        [Column("type_couverture")]
-        public string? TypeCouverture { get; set; }
-
         [Column("claim_severity_bucket")]
         public string? ClaimSeverityBucket { get; set; }
 

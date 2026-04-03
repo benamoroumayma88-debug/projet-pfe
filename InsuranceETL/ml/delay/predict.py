@@ -39,8 +39,14 @@ def load_model():
     if os.path.exists(MODEL_METADATA_PATH):
         metadata.update(joblib.load(MODEL_METADATA_PATH))
 
+    raw = joblib.load(MODEL_PATH)
+    # train.py saves a dict of all models keyed by name; extract the winner
+    if isinstance(raw, dict):
+        best_name = metadata.get('best_model_name', 'xgboost')
+        raw = raw.get(best_name, next(iter(raw.values())))
+
     model_bundle = {
-        'primary':  joblib.load(MODEL_PATH),
+        'primary':  raw,
         'metadata': metadata,
     }
 

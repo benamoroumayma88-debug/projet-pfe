@@ -153,7 +153,7 @@ def build_monthly_series(df: pd.DataFrame) -> pd.DataFrame:
 
     print(
         f"[AGGREGATE] {len(monthly)} months of history  "
-        f"({monthly.index[0].strftime('%Y-%m')} → {monthly.index[-1].strftime('%Y-%m')})"
+        f"({monthly.index[0].strftime('%Y-%m')} -> {monthly.index[-1].strftime('%Y-%m')})"
     )
     return monthly
 
@@ -166,8 +166,8 @@ def check_stationarity(series: pd.Series, name: str) -> bool:
         result = adfuller(series.dropna(), autolag="AIC")
         p_val = result[1]
         stationary = p_val < 0.05
-        label = "stationary ✓" if stationary else "non-stationary (will diff)"
-        print(f"    ADF p={p_val:.4f}  → {label}")
+        label = "stationary (OK)" if stationary else "non-stationary (will diff)"
+        print(f"    ADF p={p_val:.4f}  -> {label}")
         return stationary
     except Exception:
         return False
@@ -304,7 +304,7 @@ def train_all_models(monthly: pd.DataFrame) -> Dict:
                 "unit":        defn["unit"],
                 "description": defn["description"],
             }
-            print(f"    Saved → {model_path}\n")
+            print(f"    Saved -> {model_path}\n")
 
         except Exception as exc:
             print(f"    ERROR training {kpi}: {exc}\n")
@@ -336,7 +336,7 @@ def save_training_metadata(results: Dict, monthly: pd.DataFrame) -> None:
     os.makedirs(MODEL_DIR, exist_ok=True)
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, default=_convert)
-    print(f"[SAVE] Training manifest → {meta_path}")
+    print(f"[SAVE] Training manifest -> {meta_path}")
 
 
 # ─────────────────────────────────────────────────────────
