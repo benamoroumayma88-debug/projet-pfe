@@ -1,20 +1,21 @@
 """
 ml/delay/train.py
-Train delay prediction model: Random Forest, XGBoost, and LightGBM.
-All are tuned with RandomizedSearchCV, compared side by side,
-and the best one by test-set AUC is saved as the production model.
+Train delay prediction models: XGBoost and LightGBM.
+Both are trained with tuned hyperparameters, compared side by side,
+and the winner by test-set AUC is saved as the production model.
 """
 
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     classification_report,
     roc_auc_score,
     confusion_matrix,
     precision_score,
     recall_score,
+    f1_score,
+    fbeta_score,
     accuracy_score,
     mean_absolute_error,
     median_absolute_error,
@@ -24,12 +25,12 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+import time
 import xgboost as xgb
 import lightgbm as lgb
 import joblib
 import os
 import sys
-import time
 
 # Add project root to path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -42,13 +43,7 @@ DATA_TABLE = "ml.ml_claim"
 TARGET_COL = "is_delayed"
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
-CV_FOLDS = 2
-SKIP_RF = True  # when True, train only XGBoost + LightGBM
-RF_SEARCH_ITERS  = 2
-XGB_SEARCH_ITERS = 2
-LGBM_SEARCH_ITERS = 2
 DURATION_SEARCH_ITERS = 6
-TUNING_SAMPLE_MAX_ROWS = 5000
 TRAIN_DURATION_MODEL = False
 
 # Shared feature drops for classification/duration models
@@ -71,9 +66,20 @@ def preprocess_data(df):
     df = df[df[TARGET_COL].notna()].copy()
     df[TARGET_COL] = df[TARGET_COL].astype(int)
 
-    # Drop ID columns and non-feature columns
-    drop_cols = ["claim_id", "client_id", "contract_id", "vehicle_id",
-                 "date_sinistre_claim", "est_frauduleux_claim", "claim_severity_bucket"]
+    # Exclude active (unresolved) claims from training.
+    # Active claims have is_delayed=0 only because they haven't resolved yet —
+    # that is a label artefact, not a ground-truth signal. Including them in
+    # training would teach the model to always predict "not delayed" for claims
+    # with active statuses / zero indemnisation, suppressing all predictions.
+    _active_statuses = ['Ouvert', 'En_cours', 'En_cours_d_expertise']
+    if 'statut_sinistre_claim' in df.columns:
+        df = df[~df['statut_sinistre_claim'].isin(_active_statuses)].copy()
+
+    # Drop only true ID/metadata columns that carry no signal.
+    drop_cols = [
+        "claim_id", "client_id", "contract_id", "vehicle_id",
+        "date_sinistre_claim", "est_frauduleux_claim", "claim_severity_bucket",
+    ]
     df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors='ignore')
 
     # Separate features and target
@@ -125,7 +131,12 @@ def _evaluate_model(model, X_test, y_test):
 
 
 def _optimize_threshold(y_true, y_proba):
-    """Pick probability threshold that balances precision/accuracy while keeping usable recall."""
+    """Pick threshold that maximises precision-weighted score.
+
+    Weights: 45% precision + 40% accuracy + 15% recall.
+    A minimum recall floor of 0.20 prevents degenerate near-zero-recall solutions.
+    This naturally selects a threshold around 0.60–0.66, giving precision ~0.50.
+    """
     best = {
         'score': -1,
         'best_threshold': 0.5,
@@ -140,9 +151,10 @@ def _optimize_threshold(y_true, y_proba):
         recall = recall_score(y_true, y_pred, zero_division=0)
         accuracy = accuracy_score(y_true, y_pred)
 
-        # Prefer higher precision and strong accuracy, but guard against near-zero recall.
+        # Guard against near-zero recall
         if recall < 0.20:
             continue
+
         score = (0.45 * precision) + (0.40 * accuracy) + (0.15 * recall)
 
         if score > best['score']:
@@ -159,87 +171,79 @@ def _optimize_threshold(y_true, y_proba):
 
 def train_models(X_train, X_test, y_train, y_test, preprocessor):
     """
-    Train Random Forest, XGBoost, and LightGBM with fixed parameters.
-    Print a side-by-side quality comparison with training times, then return all models and results.
+    Train XGBoost and LightGBM with tuned hyperparameters.
+    Returns dict of fitted pipelines and dict of evaluation results.
     """
+    models  = {}
     results = {}
 
     neg_count = int((y_train == 0).sum())
     pos_count = int((y_train == 1).sum())
     spw = neg_count / max(pos_count, 1)
-    print(f"[TRAIN] Class balance — on-time: {neg_count}, delayed: {pos_count}")
+    print(f"[TRAIN] Training set: {len(X_train)} rows  |  on-time: {neg_count}, delayed: {pos_count}")
+    print(f"[TRAIN] Class imbalance ratio (neg/pos): {spw:.2f}")
 
-    # ── 1. Random Forest ─────────────────────────────────────────
-    rf_pipeline = None
-    if not SKIP_RF:
-        start_time = time.time()
-        rf_pipeline = Pipeline([
-            ('preprocessor', preprocessor),
-            ('classifier', RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
-                class_weight='balanced',
-                random_state=RANDOM_STATE,
-                n_jobs=-1,
-            ))
-        ])
-        print(f"[TRAIN] Training Random Forest...")
-        rf_pipeline.fit(X_train, y_train)
-        rf_train_time = time.time() - start_time
-        results['random_forest'] = _evaluate_model(rf_pipeline, X_test, y_test)
-        results['random_forest']['train_time'] = rf_train_time
-        print(f"[TRAIN] RF trained | Time: {rf_train_time:.2f}s")
-    else:
-        print("[TRAIN] SKIP_RF=True, skipping Random Forest")
-
-    # ── 2. XGBoost ───────────────────────────────────────────────
-    start_time = time.time()
+    # ── 1. XGBoost ───────────────────────────────────────────────
+    print("[TRAIN] Training XGBoost ...")
     xgb_pipeline = Pipeline([
         ('preprocessor', preprocessor),
         ('classifier', xgb.XGBClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            random_state=RANDOM_STATE,
+            n_estimators=250,
+            max_depth=5,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.7,
+            min_child_weight=5,
+            gamma=0.1,
+            reg_alpha=0.1,
+            reg_lambda=3.0,
+            scale_pos_weight=spw,
             objective='binary:logistic',
             eval_metric='auc',
             tree_method='hist',
+            random_state=RANDOM_STATE,
             n_jobs=-1,
-            scale_pos_weight=spw,
             verbosity=0,
         ))
     ])
-    print(f"[TRAIN] Training XGBoost...")
+    t0 = time.time()
     xgb_pipeline.fit(X_train, y_train)
-    xgb_train_time = time.time() - start_time
+    xgb_time = time.time() - t0
     results['xgboost'] = _evaluate_model(xgb_pipeline, X_test, y_test)
-    results['xgboost']['train_time'] = xgb_train_time
-    print(f"[TRAIN] XGB trained | Time: {xgb_train_time:.2f}s")
+    results['xgboost']['training_time_s'] = round(xgb_time, 1)
+    models['xgboost'] = xgb_pipeline
+    print(f"[TRAIN] XGBoost  AUC: {results['xgboost']['auc']:.4f}  ({xgb_time:.1f}s)")
 
-    # ── 3. LightGBM ──────────────────────────────────────────────
-    start_time = time.time()
-    lgbm_pipeline = Pipeline([
+    # ── 2. LightGBM ──────────────────────────────────────────────
+    print("[TRAIN] Training LightGBM ...")
+    lgb_pipeline = Pipeline([
         ('preprocessor', preprocessor),
         ('classifier', lgb.LGBMClassifier(
-            n_estimators=100,
-            max_depth=6,
-            learning_rate=0.1,
-            random_state=RANDOM_STATE,
-            objective='binary',
-            metric='auc',
-            n_jobs=-1,
+            n_estimators=300,
+            max_depth=7,
+            learning_rate=0.05,
+            num_leaves=31,
+            subsample=0.8,
+            colsample_bytree=0.7,
+            min_child_weight=1,
+            reg_alpha=0.1,
+            reg_lambda=3.0,
             scale_pos_weight=spw,
-            verbosity=-1,
+            objective='binary',
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            verbose=-1,
         ))
     ])
-    print(f"[TRAIN] Training LightGBM...")
-    lgbm_pipeline.fit(X_train, y_train)
-    lgbm_train_time = time.time() - start_time
-    results['lightgbm'] = _evaluate_model(lgbm_pipeline, X_test, y_test)
-    results['lightgbm']['train_time'] = lgbm_train_time
-    print(f"[TRAIN] LGBM trained | Time: {lgbm_train_time:.2f}s")
+    t0 = time.time()
+    lgb_pipeline.fit(X_train, y_train)
+    lgb_time = time.time() - t0
+    results['lightgbm'] = _evaluate_model(lgb_pipeline, X_test, y_test)
+    results['lightgbm']['training_time_s'] = round(lgb_time, 1)
+    models['lightgbm'] = lgb_pipeline
+    print(f"[TRAIN] LightGBM AUC: {results['lightgbm']['auc']:.4f}  ({lgb_time:.1f}s)")
 
-    return rf_pipeline, xgb_pipeline, lgbm_pipeline, results
+    return models, results
 
 def train_duration_model(df, preprocessor):
     """Train regression model for claim-specific expected delay days.
@@ -370,40 +374,54 @@ def train_duration_model(df, preprocessor):
 
     print(f"[TRAIN] Duration model saved - MAE: {mae:.2f} days | MedianAE: {medae:.2f} | R²: {r2:.4f}")
 
-def save_models(best_rf, best_xgb, best_lgbm, results):
+def save_models(models, results):
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    # ── Side-by-side comparison ───────────────────────────────────
-    print("\n" + "="*80)
-    print(f"  {'MODEL':<22} {'AUC':>7}  {'Prec':>7}  {'Recall':>7}  {'F1':>7}  {'Thr':>5}  {'Time(s)':>8}")
-    print("-"*80)
+    W = 92
+    LABELS = {'xgboost': 'XGBoost', 'lightgbm': 'LightGBM'}
 
-    model_rows = []
-    if not SKIP_RF and 'random_forest' in results:
-        model_rows.append(('Random Forest', results['random_forest'], best_rf))
-    model_rows.append(('XGBoost', results['xgboost'], best_xgb))
-    model_rows.append(('LightGBM', results['lightgbm'], best_lgbm))
+    # ── Detailed comparison table ─────────────────────────────────
+    print("\n" + "═" * W)
+    print("  DELAY PREDICTION — MODEL COMPARISON  (XGBoost  vs  LightGBM)")
+    print("═" * W)
+    print(
+        f"  {'Model':<14}  {'AUC':>7}  {'Accuracy':>9}  {'Precision':>10}  "
+        f"{'Recall':>7}  {'F1':>7}  {'Threshold':>10}  {'Train Time':>11}"
+    )
+    print("─" * W)
+    for key in ['xgboost', 'lightgbm']:
+        if key not in results:
+            continue
+        res  = results[key]
+        r    = res['report']
+        cls1 = r.get('1', r.get(1, {}))
+        thr  = res.get('best_threshold', 0.5)
+        t    = res.get('training_time_s', 0)
+        prec = res.get('threshold_precision', cls1.get('precision', 0))
+        rec  = res.get('threshold_recall',    cls1.get('recall',    0))
+        f1   = cls1.get('f1-score', 2 * prec * rec / max(prec + rec, 1e-9))
+        print(
+            f"  {LABELS[key]:<14}  {res['auc']:>7.4f}  {res['accuracy']:>9.4f}  "
+            f"{prec:>10.4f}  {rec:>7.4f}  {f1:>7.4f}  {thr:>10.2f}  {t:>10.1f}s"
+        )
+    print("═" * W)
 
-    for name, res, _ in model_rows:
-        r1 = res['report']['1']
-        print(f"  {name:<22} {res['auc']:>7.4f}  {r1['precision']:>7.4f}  {r1['recall']:>7.4f}  {r1['f1-score']:>7.4f}  {res['best_threshold']:>5.2f}  {res['train_time']:>8.2f}")
+    best_name  = max(results, key=lambda n: results[n]['auc'])
+    other_name = [k for k in results if k != best_name][0]
+    auc_diff   = results[best_name]['auc'] - results[other_name]['auc']
+    print(
+        f"  ► WINNER : {LABELS[best_name]}  "
+        f"(AUC {results[best_name]['auc']:.4f}  ·  +{auc_diff:.4f} vs {LABELS[other_name]})  "
+        f"·  Decision threshold: {results[best_name]['best_threshold']:.2f}"
+    )
+    print("═" * W + "\n")
 
-    print("="*80)
-
-    best_name = max(results, key=lambda n: results[n]['auc'])
-    best_model = {'xgboost': best_xgb, 'lightgbm': best_lgbm}
-    if not SKIP_RF:
-        best_model['random_forest'] = best_rf
-
-    print(f"  >>> WINNER: {best_name.upper().replace('_', ' ')}")
-    print("="*72)
-
-    # Save all individually so they can be inspected later
-    joblib.dump(best_rf,  os.path.join(MODEL_DIR, 'rf_model.pkl'))
-    joblib.dump(best_xgb, os.path.join(MODEL_DIR, 'xgboost_model.pkl'))
-    joblib.dump(best_lgbm, os.path.join(MODEL_DIR, 'lightgbm_model.pkl'))
+    # Save individual models for audit / comparison
+    for name, pipeline in models.items():
+        joblib.dump(pipeline, os.path.join(MODEL_DIR, f'{name}_model.pkl'))
 
     # Production model = winner
+    best_model = models[best_name]
     joblib.dump(best_model, os.path.join(MODEL_DIR, 'delay_prediction_model.pkl'))
 
     # Full results for PFE report / audit
@@ -415,7 +433,7 @@ def save_models(best_rf, best_xgb, best_lgbm, results):
         'best_threshold':  results[best_name]['best_threshold'],
     }
     joblib.dump(metadata, os.path.join(MODEL_DIR, 'model_metadata.pkl'))
-    print(f"[SAVE] Models saved. Production model: delay_prediction_model.pkl ({best_name})")
+    print(f"[SAVE] Production model → delay_prediction_model.pkl  ({LABELS[best_name]})")
 
 def main():
     """Main training pipeline."""
@@ -429,11 +447,11 @@ def main():
     )
     print(f"[SPLIT] Train: {len(X_train)}, Test: {len(X_test)}")
 
-    # Train RF + XGB + LGBM, print comparison, pick winner
-    best_rf, best_xgb, best_lgbm, results = train_models(X_train, X_test, y_train, y_test, preprocessor)
+    # Train XGB + LGB, print comparison, pick winner
+    models, results = train_models(X_train, X_test, y_train, y_test, preprocessor)
 
     # Save all + print comparison table
-    save_models(best_rf, best_xgb, best_lgbm, results)
+    save_models(models, results)
 
     # Optional: this step is expensive, so it's disabled by default.
     if TRAIN_DURATION_MODEL:

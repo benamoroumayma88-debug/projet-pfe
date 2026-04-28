@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Data.SqlClient;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace InsuranceWeb.Controllers
 {
@@ -11,6 +13,14 @@ namespace InsuranceWeb.Controllers
     {
         private readonly IConfiguration _config;
         private readonly ILogger<DataUploadController> _logger;
+
+        // ── Pipeline tracking (single-server) ──
+        private static readonly object _pipelineLock = new();
+        private static Process? _runningPipeline;
+        private static string _pipelineStatus = "idle"; // idle | running | completed | failed
+        private static string _pipelineOutput = "";
+        private static DateTime? _pipelineStartTime;
+        private static DateTime? _pipelineEndTime;
 
         // Allowed tables and their schema
         private static readonly Dictionary<string, string[]> AllowedTables = new()
@@ -200,7 +210,21 @@ namespace InsuranceWeb.Controllers
                 _logger.LogInformation("User {User} uploaded {Count} rows to {Table}",
                     User.FindFirst("Login")?.Value, insertedCount, targetTable);
 
+                // Trigger the ETL + ML pipeline in the background
+                var pipelineTriggered = TriggerPipeline();
+
                 ViewBag.Success = $"Successfully uploaded {insertedCount} rows to {targetTable}.";
+                if (pipelineTriggered)
+                {
+                    ViewBag.PipelineTriggered = true;
+                    ViewBag.Success += " The ETL & ML pipeline has been triggered in the background.";
+                }
+                else
+                {
+                    ViewBag.PipelineAlreadyRunning = true;
+                    ViewBag.Success += " A pipeline is already running — it will pick up the new data.";
+                }
+
                 return View("Index");
             }
             catch (Exception ex)
@@ -209,6 +233,135 @@ namespace InsuranceWeb.Controllers
                 ViewBag.Error = $"Upload failed: {ex.Message}";
                 return View("Index");
             }
+        }
+
+        /// <summary>
+        /// AJAX endpoint: returns current pipeline status as JSON.
+        /// </summary>
+        [HttpGet]
+        public IActionResult PipelineStatus()
+        {
+            lock (_pipelineLock)
+            {
+                return Json(new
+                {
+                    status = _pipelineStatus,
+                    output = _pipelineOutput,
+                    startTime = _pipelineStartTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    endTime = _pipelineEndTime?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    durationSeconds = _pipelineStartTime.HasValue
+                        ? (int)((_pipelineEndTime ?? DateTime.Now) - _pipelineStartTime.Value).TotalSeconds
+                        : 0
+                });
+            }
+        }
+
+        /// <summary>
+        /// Launch auto_pipeline.py --force as a background process.
+        /// Returns false if a pipeline is already running.
+        /// </summary>
+        private bool TriggerPipeline()
+        {
+            lock (_pipelineLock)
+            {
+                if (_pipelineStatus == "running" && _runningPipeline != null && !_runningPipeline.HasExited)
+                {
+                    _logger.LogInformation("Pipeline already running — skipping trigger.");
+                    return false;
+                }
+
+                var pythonPath = _config["Pipeline:PythonPath"] ?? "python";
+                var scriptPath = _config["Pipeline:ScriptPath"] ?? @"..\InsuranceETL\auto_pipeline.py";
+
+                // Resolve relative to the web app's content root
+                if (!Path.IsPathRooted(scriptPath))
+                {
+                    scriptPath = Path.GetFullPath(Path.Combine(
+                        Directory.GetCurrentDirectory(), scriptPath));
+                }
+
+                _pipelineStatus = "running";
+                _pipelineOutput = "";
+                _pipelineStartTime = DateTime.Now;
+                _pipelineEndTime = null;
+
+                _logger.LogInformation("Triggering pipeline: {Python} {Script} --force",
+                    pythonPath, scriptPath);
+            }
+
+            // Start outside the lock so it doesn't block
+            var pythonExe = _config["Pipeline:PythonPath"] ?? "python";
+            var script = _config["Pipeline:ScriptPath"] ?? @"..\InsuranceETL\auto_pipeline.py";
+            if (!Path.IsPathRooted(script))
+            {
+                script = Path.GetFullPath(Path.Combine(
+                    Directory.GetCurrentDirectory(), script));
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = pythonExe,
+                Arguments = $"\"{script}\" --force",
+                WorkingDirectory = Path.GetDirectoryName(script),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            psi.Environment["PYTHONIOENCODING"] = "utf-8";
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var process = new Process { StartInfo = psi };
+                    var output = new StringBuilder();
+
+                    process.OutputDataReceived += (_, e) =>
+                    {
+                        if (e.Data != null)
+                        {
+                            lock (_pipelineLock) { _pipelineOutput += e.Data + "\n"; }
+                        }
+                    };
+                    process.ErrorDataReceived += (_, e) =>
+                    {
+                        if (e.Data != null)
+                        {
+                            lock (_pipelineLock) { _pipelineOutput += "[ERR] " + e.Data + "\n"; }
+                        }
+                    };
+
+                    process.Start();
+                    lock (_pipelineLock) { _runningPipeline = process; }
+
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+                    process.WaitForExit();
+
+                    lock (_pipelineLock)
+                    {
+                        _pipelineEndTime = DateTime.Now;
+                        _pipelineStatus = process.ExitCode == 0 ? "completed" : "failed";
+                        _runningPipeline = null;
+                    }
+
+                    _logger.LogInformation("Pipeline finished with exit code {Code}", process.ExitCode);
+                }
+                catch (Exception ex)
+                {
+                    lock (_pipelineLock)
+                    {
+                        _pipelineStatus = "failed";
+                        _pipelineOutput += $"\n[FATAL] {ex.Message}\n";
+                        _pipelineEndTime = DateTime.Now;
+                        _runningPipeline = null;
+                    }
+                    _logger.LogError(ex, "Pipeline process failed");
+                }
+            });
+
+            return true;
         }
 
         [HttpGet]

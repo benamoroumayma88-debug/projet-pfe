@@ -1,0 +1,9 @@
+claim_type,claim_count,total_indemnisation_tnd,avg_indemnisation_tnd,pct_of_total_budget
+Collision,1540,6.3753295e+06,4139.82,38.6
+Dommages Corporels,369,3.785113e+06,10257.76,22.9
+Vol,285,1.8085916e+06,6345.94,11.0
+Incendie,225,1.7893545e+06,7952.69,10.8
+Catastrophe Naturelle,152,1.6365019e+06,10766.46,9.9
+Bris De Glace,451,613476.4,1360.26,3.7
+Accident,185,342881.44,1853.41,2.1
+Responsabilité Civile,80,147641.36,1845.52,0.9

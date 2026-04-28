@@ -313,7 +313,8 @@ def load_all(conn: pyodbc.Connection, out: dict, mode: str = "replace") -> None:
     ]
 
     for schema, table, df, pk in mapping:
-        if df is None:
+        if df is None or (hasattr(df, 'empty') and df.empty):
+            print(f"[LOAD] Skipping {schema}.{table} (empty or no data)")
             continue
         print(f"[LOAD] Loading {schema}.{table} ({len(df)} rows)")
         load_table(conn, schema, table, df, mode=mode, primary_key=pk)

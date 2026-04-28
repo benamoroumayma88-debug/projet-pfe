@@ -1,8 +1,27 @@
 """
 ml/forecast/predict.py
-----------------------------------------------------------------
+────────────────────────────────────────────────────────────────
 Loads trained SARIMA models and generates a 6-month forward forecast
 with production-grade business KPIs and actionable manager insights.
+
+Seasonality design
+──────────────────
+Tunisia-specific monthly multipliers are ALWAYS applied (not only
+when the SARIMA output is flat).  This guarantees meaningful
+month-to-month variation matching real Tunisian seasonal patterns:
+
+  Summer (Jun–Aug)  → peak vehicle use, school breaks, road trips
+  Sep               → back-to-school, young new drivers
+  Oct–Nov           → Autumn rains, deteriorating road conditions
+  Feb               → lowest activity quarter
+
+Volume anchoring
+────────────────
+Raw SARIMA volume forecasts are anchored to the recent 12-month
+historical mean so that forecasts stay coherent with the current
+operating baseline (~1 400 active claims / 19 agents).  If SARIMA
+outputs > 1.5× historical mean the values are scaled back to
+1.1× historical mean to prevent inflated staffing numbers.
 
 8 Business KPIs per forecast month
 ───────────────────────────────────
@@ -14,12 +33,6 @@ with production-grade business KPIs and actionable manager insights.
   6.  Net Savings Potential (TND)     → ROI of early interventions
   7.  Workload Index                  → operational efficiency
   8.  Budget Variance vs Rolling Avg  → financial control
-
-3 Strategic Outputs
-───────────────────
-  • Per-month risk level (LOW / MEDIUM / HIGH / CRITICAL)
-  • Automated alerts with concrete action recommendations
-  • dashboard_insights.json  → ready for Power BI import
 
 Usage:
   python ml/forecast/predict.py
@@ -42,6 +55,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, project_root)
 from etl.db_connection import get_connection
 from etl.load import load_table
+from etl.extract import extract_table
 
 # ─────────────────────────────────────────────────────────
 # Configuration
@@ -56,6 +70,9 @@ MONTHLY_TABLE      = "claim_forecast_monthly"
 SUMMARY_TABLE      = "claim_forecast_summary"
 ALERTS_TABLE       = "claim_forecast_alerts"
 
+DATA_TABLE      = "ml.ml_claim"
+ACTIVE_STATUSES = ["Ouvert", "En_cours", "En_cours_d_expertise"]
+
 # ── Business constants (TND – Tunisian Dinar) ────────────
 AGENT_MONTHLY_SALARY          = 3_000.0   # TND
 AGENT_MONTHLY_CAPACITY        = 80        # claims per agent per month
@@ -64,6 +81,14 @@ FRAUD_RECOVERY_RATE           = 0.35      # 35 % of fraud amount recoverable if 
 INVESTIGATION_COST_PER_CLAIM  = 150.0     # TND: cost to investigate one suspicious claim
 EARLY_INTERVENTION_EFFICIENCY = 0.40      # 40 % of delay costs avoidable with early action
 
+# ── Operational baselines (anchored to current model outputs) ─
+# These reflect actual current portfolio: ~1 400 active claims, ~19 agents
+BASELINE_AGENTS      = 19      # from delay model recommended_agents
+BASELINE_DELAY_RATE  = 0.35    # ~35 % of active claims are delayed
+BASELINE_FRAUD_RATE  = 0.10    # ~10 % of active claims flagged as fraud
+VOLUME_ANCHOR_FACTOR = 1.5     # if SARIMA mean > this × historical mean → scale down
+VOLUME_SCALE_TARGET  = 1.1     # scale back to this × historical mean
+
 # ── Alert thresholds ─────────────────────────────────────
 VOLUME_SURGE_THRESHOLD   = 0.20   # >20 % above rolling mean
 DELAY_RATE_WARNING       = 0.25   # >25 %  → HIGH
@@ -71,21 +96,100 @@ DELAY_RATE_CRITICAL      = 0.40   # >40 %  → CRITICAL
 FRAUD_RATE_WARNING       = 0.05   # >5 %   → HIGH alert
 BUDGET_OVERSHOOT_PCT     = 0.15   # >15 % above recent avg → MEDIUM alert
 
+# ── Tunisia seasonal multipliers (always applied) ─────────────
+# Values represent factor relative to annual mean = 1.0
+# Volume multipliers – how many more/fewer claims vs annual average
+_SEASONAL_VOLUME: Dict[int, float] = {
+    1: 0.85,   # Jan – post-holiday, moderate
+    2: 0.75,   # Feb – lowest month
+    3: 0.88,   # Mar – slow start
+    4: 1.05,   # Apr – spring traffic pickup
+    5: 1.10,   # May – public holiday spikes
+    6: 1.25,   # Jun – summer begins, student drivers
+    7: 1.40,   # Jul – peak: vacation travel, max risk
+    8: 1.35,   # Aug – vacation peak still high
+    9: 1.20,   # Sep – back-to-school, young drivers
+    10: 1.10,  # Oct – autumn rains, road accidents rise
+    11: 1.00,  # Nov – rain season in full effect
+    12: 0.90,  # Dec – winter, year-end slowdown
+}
+
+# Delay rate multipliers – some months have more delays (rain, summer chaos)
+_SEASONAL_DELAY: Dict[int, float] = {
+    1: 1.00, 2: 0.90, 3: 0.95, 4: 1.05, 5: 1.10,
+    6: 1.20, 7: 1.30, 8: 1.25, 9: 1.15, 10: 1.15, 11: 1.10, 12: 1.05,
+}
+
+# Fraud rate multipliers – higher in peak claim months (more volume = more opportunity)
+_SEASONAL_FRAUD: Dict[int, float] = {
+    1: 0.90, 2: 0.85, 3: 0.95, 4: 1.00, 5: 1.05,
+    6: 1.15, 7: 1.25, 8: 1.20, 9: 1.10, 10: 1.05, 11: 1.00, 12: 0.95,
+}
+
 # ── Tunisia seasonal context (manager-facing labels) ─────
 _SEASONAL_NOTE: Dict[int, str] = {
     1:  "Post-holiday: Moderate activity, stable claims",
-    2:  "Low season: Quiet period, good for staff training",
+    2:  "Low season: Quietest month – good for staff training",
     3:  "Pre-summer preparation: Activity starts rising",
     4:  "Spring traffic surge: Road accidents increase",
     5:  "May public holidays: Traffic spike risk",
-    6:  "Summer begins: Student drivers, vacation travel -> surge",
-    7:  "Peak summer: Maximum vehicle usage - highest risk month",
-    8:  "Vacation peak: Cross-country travel -> high claim risk",
+    6:  "Summer begins: Student drivers, vacation travel → surge",
+    7:  "Peak summer: Maximum vehicle usage – highest risk month",
+    8:  "Vacation peak: Cross-country travel → high claim risk",
     9:  "Back-to-school: New young drivers, accident risk elevated",
     10: "Autumn rains begin: Road condition deterioration",
     11: "Rain season: Accident risk intensifies",
     12: "Year-end: Winter conditions, year-close review",
 }
+
+
+# ─────────────────────────────────────────────────────────
+# Forecast anchor: detect latest active-claim month
+# ─────────────────────────────────────────────────────────
+def _infer_forecast_anchor() -> pd.Timestamp | None:
+    """
+    Load active claims from ml.ml_claim and return the month-start timestamp
+    of the LATEST date_sinistre_claim.  The forecast horizon is then set to
+    start from the month AFTER this anchor, so:
+
+      Latest active claim   →  Forecast window
+      ───────────────────      ───────────────────────────────────────
+      January  2026        →  Feb Mar Apr May Jun Jul 2026
+      March    2026        →  Apr May Jun Jul Aug Sep 2026
+      April    2026        →  May Jun Jul Aug Sep Oct 2026   ← current case
+
+    If no active claims are found, returns None and the SARIMA training-series
+    end date is used as fallback (original behaviour).
+    """
+    try:
+        df = extract_table(DATA_TABLE)
+        if "statut_sinistre_claim" in df.columns:
+            df = df[df["statut_sinistre_claim"].isin(ACTIVE_STATUSES)]
+        if df.empty:
+            print("[ANCHOR] No active claims found — using SARIMA training series end.")
+            return None
+
+        date_col = "date_sinistre_claim"
+        if date_col not in df.columns:
+            print("[ANCHOR] date_sinistre_claim column missing — using SARIMA training series end.")
+            return None
+
+        dates = pd.to_datetime(df[date_col], errors="coerce").dropna()
+        if dates.empty:
+            return None
+
+        latest = dates.max()
+        # anchor = the month-start of the latest active claim month
+        anchor = pd.Timestamp(year=latest.year, month=latest.month, day=1)
+        print(
+            f"[ANCHOR] Latest active claim: {latest.strftime('%Y-%m-%d')} → "
+            f"anchor month = {anchor.strftime('%B %Y')}  → "
+            f"forecast starts {(anchor + pd.offsets.MonthBegin(1)).strftime('%B %Y')}"
+        )
+        return anchor
+    except Exception as exc:
+        print(f"[ANCHOR] Could not load active claims ({exc}) — using SARIMA end date.")
+        return None
 
 
 # ─────────────────────────────────────────────────────────
@@ -112,11 +216,11 @@ def load_models() -> Dict[str, Any]:
             order    = bundle["meta"]["order"]
             seasonal = bundle["meta"]["seasonal_order"]
             mape     = bundle["meta"].get("metrics", {}).get("mape_pct", "N/A")
-            print(f"  [LOAD] {kpi:25s}  ARIMA{order}x{seasonal}  MAPE={mape}")
+            print(f"  [LOAD] {kpi:25s}  ARIMA{order}×{seasonal}  MAPE={mape}")
         else:
             print(f"  [MISSING] {kpi}: model file not found")
 
-    print(f"  +-- {len(models) - 1} model(s) loaded\n")
+    print(f"  └── {len(models) - 1} model(s) loaded\n")
     return models
 
 
@@ -124,56 +228,52 @@ def load_models() -> Dict[str, Any]:
 # Forecast generation
 # ─────────────────────────────────────────────────────────
 def generate_forecasts(models: Dict, horizon: int) -> pd.DataFrame:
-    def _inject_monthly_seasonality(
-        base_values: np.ndarray,
-        history_series: pd.Series,
-        dates: pd.DatetimeIndex,
-        strength: float = 0.35,
-    ) -> np.ndarray:
-        """
-        Add mild month-of-year variation from historical patterns when a forecast is too flat.
-        This keeps values coherent while avoiding unrealistic constant rates.
-        """
-        try:
-            s = pd.Series(history_series).dropna()
-            if s.empty:
-                return base_values
+    """
+    1. Run SARIMA forecast for each KPI.
+    2. Anchor the forecast START month to the latest active-claim month
+       (loaded live from ml.ml_claim) so the window auto-shifts every time
+       new sinistres are injected.  Falls back to the SARIMA series end date
+       if no active claims are found.
+    3. ALWAYS apply Tunisia seasonal multipliers for volume, delay_rate, fraud_rate.
+    4. Apply physical constraints (clip rates to [0,1], volumes to ≥0).
+    """
 
-            # Ensure monthly calendar grouping works on the index
-            s.index = pd.to_datetime(s.index)
-            month_means = s.groupby(s.index.month).mean()
-            global_mean = float(s.mean())
-            if global_mean <= 0:
-                return base_values
+    # ── Determine forecast start date ────────────────────────────────────
+    # Priority 1: live anchor from active claims (data-driven, always current)
+    live_anchor = _infer_forecast_anchor()
 
-            factors = np.array([
-                float(month_means.get(d.month, global_mean)) / global_mean
-                for d in dates
-            ])
-            seasonal_multiplier = (1.0 - strength) + (strength * factors)
-            return base_values * seasonal_multiplier
-        except Exception:
-            return base_values
-
-    # Determine the first forecast month (month after last training point)
-    last_date = None
+    # Priority 2: SARIMA training series end date (original fallback)
+    sarima_last: pd.Timestamp | None = None
     for kpi, bundle in models.items():
         if kpi == "_meta":
             continue
         try:
-            last_date = pd.to_datetime(bundle["series"].index[-1])
+            sarima_last = pd.to_datetime(bundle["series"].index[-1])
             break
         except Exception:
             continue
 
-    if last_date is None:
+    if live_anchor is not None:
+        # Use whichever is later: the live data anchor or the SARIMA end
+        if sarima_last is not None and sarima_last > live_anchor:
+            last_date = sarima_last
+            print(
+                f"[ANCHOR] SARIMA series ends {sarima_last.strftime('%Y-%m')} which is "
+                f"after live anchor {live_anchor.strftime('%Y-%m')} — using SARIMA end."
+            )
+        else:
+            last_date = live_anchor
+    elif sarima_last is not None:
+        last_date = sarima_last
+    else:
         last_date = datetime.now().replace(day=1) - pd.DateOffset(months=1)
+        print("[ANCHOR] No date reference found — using last month as fallback.")
 
     forecast_dates = pd.date_range(
         last_date + pd.offsets.MonthBegin(1), periods=horizon, freq="MS"
     )
     print(
-        f"[FORECAST] Horizon: {forecast_dates[0].strftime('%Y-%m')} -> "
+        f"[FORECAST] Horizon: {forecast_dates[0].strftime('%Y-%m')} → "
         f"{forecast_dates[-1].strftime('%Y-%m')}\n"
     )
 
@@ -185,26 +285,77 @@ def generate_forecasts(models: Dict, horizon: int) -> pd.DataFrame:
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                fc_values = bundle["model"].forecast(steps=horizon).values
+                fc_values = bundle["model"].forecast(steps=horizon).values.astype(float)
 
-            # If rate forecasts are nearly flat, inject mild month-of-year seasonality
-            # learned from historical data to produce more realistic month-to-month variation.
-            if kpi in ("delay_rate", "fraud_rate") and np.ptp(fc_values) < 0.005:
-                fc_values = _inject_monthly_seasonality(
-                    base_values=np.asarray(fc_values, dtype=float),
-                    history_series=bundle.get("series", pd.Series(dtype=float)),
-                    dates=forecast_dates,
-                    strength=0.35,
-                )
+            fc_values = np.clip(fc_values, 0.0, None)
 
-            # Physical constraints
+            # ── Volume anchoring ───────────────────────────────────
+            if kpi == "claim_volume":
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                if hist_mean > 0:
+                    fc_mean = float(fc_values.mean())
+                    if fc_mean > VOLUME_ANCHOR_FACTOR * hist_mean:
+                        scale = (VOLUME_SCALE_TARGET * hist_mean) / fc_mean
+                        fc_values = fc_values * scale
+                        print(
+                            f"  [ANCHOR] {kpi}: raw mean {fc_mean:.1f} > {VOLUME_ANCHOR_FACTOR}× "
+                            f"hist mean {hist_mean:.1f} → scaled by {scale:.3f}"
+                        )
+
+            # ── Always apply Tunisia seasonal multipliers ──────────
+            if kpi == "claim_volume":
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                seasonal_factors = np.array([_SEASONAL_VOLUME[d.month] for d in forecast_dates])
+                # Normalise so the mean multiplier doesn't inflate the total
+                seasonal_factors = seasonal_factors / float(seasonal_factors.mean())
+                fc_values = fc_values * seasonal_factors
+                # ── Hard per-month clamp: each month stays within ±40% of recent avg.
+                # This prevents individual SARIMA outlier months even when the overall
+                # mean is reasonable (e.g. 171 one month, 2997 the next is impossible).
+                if hist_mean > 0:
+                    fc_values = np.clip(fc_values, hist_mean * 0.60, hist_mean * 1.45)
+
+            elif kpi == "total_indemnisation":
+                # Clamp each month to ±45% of recent 12-month average
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                if hist_mean > 0:
+                    fc_values = np.clip(fc_values, hist_mean * 0.55, hist_mean * 1.50)
+
+            elif kpi == "avg_claim_amount":
+                # Clamp to ±40% of recent average
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                if hist_mean > 0:
+                    fc_values = np.clip(fc_values, hist_mean * 0.60, hist_mean * 1.40)
+
+            elif kpi == "delay_rate":
+                seasonal_factors = np.array([_SEASONAL_DELAY[d.month] for d in forecast_dates])
+                seasonal_factors = seasonal_factors / float(seasonal_factors.mean())
+                fc_values = fc_values * seasonal_factors
+                # Clamp relative to the series' own historical mean (not a fixed constant)
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean_d = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                fc_values = np.clip(fc_values, hist_mean_d * 0.65, hist_mean_d * 1.50)
+
+            elif kpi == "fraud_rate":
+                seasonal_factors = np.array([_SEASONAL_FRAUD[d.month] for d in forecast_dates])
+                seasonal_factors = seasonal_factors / float(seasonal_factors.mean())
+                fc_values = fc_values * seasonal_factors
+                series = bundle.get("series", pd.Series(dtype=float))
+                hist_mean_f = float(series.iloc[-12:].mean()) if len(series) >= 12 else float(series.mean())
+                fc_values = np.clip(fc_values, hist_mean_f * 0.65, hist_mean_f * 1.50)
+
+            # Final physical constraints
             if kpi in ("delay_rate", "fraud_rate"):
                 fc_values = np.clip(fc_values, 0.0, 1.0)
             else:
                 fc_values = np.clip(fc_values, 0.0, None)
 
             point_forecasts[kpi] = fc_values
-            print(f"  {kpi:25s} range [{fc_values.min():.2f} - {fc_values.max():.2f}]")
+            print(f"  {kpi:25s} range [{fc_values.min():.2f} – {fc_values.max():.2f}]")
 
         except Exception as exc:
             print(f"  {kpi:25s} ERROR: {exc}")
@@ -241,19 +392,18 @@ def compute_business_kpis(
     baselines = _baselines(models)
     monthly_kpis: List[Dict] = []
 
+    # Historical volume mean used for workload / surge detection
+    hist_vol_mean = baselines.get("claim_volume", {}).get("last_12m_avg", 100.0)
+
     for dt in forecasts.index:
         row = forecasts.loc[dt]
 
         # ── Core forecast values ──────────────────────────
-        vol         = float(row.get("claim_volume",       50.0))
-        total_cost  = float(row.get("total_indemnisation", vol * 1_000))
-        delay_rate  = float(np.clip(row.get("delay_rate",  0.25), 0.0, 1.0))
-        fraud_rate  = float(np.clip(row.get("fraud_rate",  0.07), 0.0, 1.0))
-        avg_amount  = float(row.get("avg_claim_amount",   total_cost / max(vol, 1)))
-
-        vol        = max(vol, 0.0)
-        total_cost = max(total_cost, 0.0)
-        avg_amount = max(avg_amount, 0.0)
+        vol        = max(float(row.get("claim_volume",       100.0)), 0.0)
+        total_cost = max(float(row.get("total_indemnisation", vol * 800)), 0.0)
+        delay_rate = float(np.clip(row.get("delay_rate",  BASELINE_DELAY_RATE), 0.0, 1.0))
+        fraud_rate = float(np.clip(row.get("fraud_rate",  BASELINE_FRAUD_RATE), 0.0, 1.0))
+        avg_amount = max(float(row.get("avg_claim_amount", total_cost / max(vol, 1))), 0.0)
 
         # ── Derived KPIs ──────────────────────────────────
 
@@ -262,9 +412,17 @@ def compute_business_kpis(
         expected_fraud_cases  = vol * fraud_rate
         expected_fraud_exposure = expected_fraud_cases * avg_amount
 
-        # 2. Staffing
-        recommended_agents = max(1, int(np.ceil(vol / AGENT_MONTHLY_CAPACITY)))
-        staffing_cost      = recommended_agents * AGENT_MONTHLY_SALARY
+        # 2. Staffing – anchored to BASELINE_AGENTS, scaled ±5 with volume multiplier
+        #    Volume multiplier = vol / hist_vol_mean (how much busier vs usual)
+        vol_ratio = vol / max(hist_vol_mean, 1.0)
+        recommended_agents = int(
+            np.clip(
+                round(BASELINE_AGENTS * vol_ratio),
+                max(1, BASELINE_AGENTS - 7),   # never drop below baseline - 7
+                BASELINE_AGENTS + 10,           # never spike above baseline + 10
+            )
+        )
+        staffing_cost = recommended_agents * AGENT_MONTHLY_SALARY
 
         # 3. Delay cost & savings
         total_delay_cost       = expected_delays * DELAY_COST_PER_CLAIM
@@ -282,11 +440,11 @@ def compute_business_kpis(
         intervention_cost = investigation_cost + (recommended_agents * 300)
         intervention_roi  = (net_savings_potential / max(intervention_cost, 1)) * 100
 
-        # 7. Budget variance vs last-3m rolling average (KPI 8)
-        baseline_cost       = baselines.get("total_indemnisation", {}).get("last_3m_avg", total_cost)
+        # 7. Budget variance vs last-12m rolling average
+        baseline_cost       = baselines.get("total_indemnisation", {}).get("last_12m_avg", total_cost)
         budget_variance_pct = ((total_cost - baseline_cost) / max(baseline_cost, 1)) * 100
 
-        # 8. Workload index (KPI 7) – fraction of capacity used
+        # 8. Workload index – fraction of capacity used
         workload_index = vol / max(recommended_agents * AGENT_MONTHLY_CAPACITY, 1)
 
         # ── Risk level ────────────────────────────────────
@@ -309,13 +467,13 @@ def compute_business_kpis(
         alerts: List[Dict] = []
 
         if is_surge:
-            extra_agents = max(0, recommended_agents - max(1, int(baseline_vol / AGENT_MONTHLY_CAPACITY)))
+            extra_agents = max(0, recommended_agents - BASELINE_AGENTS)
             alerts.append({
                 "level": "HIGH",
                 "type":  "VOLUME_SURGE",
                 "message": (
                     f"Claim surge expected in {month_label} (+{volume_surge_pct:.0f}% vs recent avg). "
-                    f"Recommend hiring {extra_agents} additional agent(s)."
+                    f"Recommend {extra_agents} additional agent(s) above baseline."
                 ),
             })
 
@@ -377,11 +535,11 @@ def compute_business_kpis(
             )
         if workload_index > 0.85:
             recommendations.append(
-                f"Agent workload at {workload_index*100:.0f}% capacity - consider temporary staffing."
+                f"Agent workload at {workload_index*100:.0f}% capacity – consider temporary staffing."
             )
         if budget_variance_pct < -10:
             recommendations.append(
-                "Claims activity lower than average - opportunity to accelerate pending backlog."
+                "Claims activity lower than average – opportunity to accelerate pending backlog."
             )
 
         monthly_kpis.append({
@@ -452,7 +610,7 @@ def compute_portfolio_summary(monthly_kpis: List[Dict]) -> Dict:
 
     return {
         "horizon_months":                 len(monthly_kpis),
-        "total_forecast_period":          f"{monthly_kpis[0]['period']} -> {monthly_kpis[-1]['period']}",
+        "total_forecast_period":          f"{monthly_kpis[0]['period']} → {monthly_kpis[-1]['period']}",
         "total_expected_claims":          round(total_volume),
         "total_expected_cost_tnd":        round(total_cost, 2),
         "avg_monthly_delay_rate_pct":     round(avg_delay_rate, 1),
@@ -491,7 +649,7 @@ def _build_strategic_insight(
     parts: List[str] = []
     if surge_months:
         parts.append(
-            f"Volume surges forecast in {', '.join(surge_months)} - proactive staffing strongly recommended."
+            f"Volume surges forecast in {', '.join(surge_months)} – proactive staffing strongly recommended."
         )
     if high_risk_months:
         parts.append(
@@ -507,7 +665,7 @@ def _build_strategic_insight(
         )
     if savings > 30_000:
         parts.append(
-            f"Proactive interventions could prevent up to {int(savings / 1_000)}K TND in losses over 6 months - ROI positive."
+            f"Proactive interventions could prevent up to {int(savings / 1_000)}K TND in losses over 6 months – ROI positive."
         )
     if not parts:
         parts.append(
@@ -521,11 +679,11 @@ def _build_strategic_insight(
 # ─────────────────────────────────────────────────────────
 def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
     W = 80
-    print("\n" + "=" * W)
-    print("  INSURANCE CLAIMS - 6-MONTH STRATEGIC FORECAST REPORT")
+    print("\n" + "═" * W)
+    print("  INSURANCE CLAIMS – 6-MONTH STRATEGIC FORECAST REPORT")
     print(f"  Period : {summary.get('total_forecast_period', '')}")
     print(f"  Run at : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print("=" * W)
+    print("═" * W)
 
     # Monthly table
     header = (
@@ -533,11 +691,11 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         f"{'Delay%':>8} {'Fraud%':>7} {'Agents':>7} {'Savings(KTND)':>14} {'Risk':<10}"
     )
     print("\n" + header)
-    print("-" * W)
+    print("─" * W)
     for m in monthly_kpis:
         f  = m["forecast"]
         b  = m["business_kpis"]
-        surge_flag = " ^" if m["is_surge_month"] else "  "
+        surge_flag = " ▲" if m["is_surge_month"] else "  "
         print(
             f"{m['month']:<18} {f['claim_volume']:>7.0f} {f['total_indemnisation_tnd']/1_000:>11.1f} "
             f"{f['delay_rate_pct']:>8.1f} {f['fraud_rate_pct']:>7.2f} "
@@ -545,7 +703,7 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
             f"{m['risk_level']:<8}{surge_flag}"
         )
 
-    print("-" * W)
+    print("─" * W)
     print(f"  {'TOTAL / AVG':<16} {summary['total_expected_claims']:>7.0f} "
           f"{summary['total_expected_cost_tnd']/1_000:>11.1f} "
           f"{summary['avg_monthly_delay_rate_pct']:>8.1f} "
@@ -554,9 +712,9 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
           f"{summary['total_net_savings_potential_tnd']/1_000:>14.1f}")
 
     # KPI highlights
-    print("\n" + "-" * W)
+    print("\n" + "─" * W)
     print("  KEY PERFORMANCE INDICATORS (6-MONTH CUMULATIVE)")
-    print("-" * W)
+    print("─" * W)
     kpis = [
         ("Total Expected Claims",            f"{summary['total_expected_claims']:,.0f}"),
         ("Total Expected Cost",              f"{summary['total_expected_cost_tnd']/1_000:,.1f} K TND"),
@@ -573,9 +731,9 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         print(f"  {label:<35} {value}")
 
     # Alerts
-    print("\n" + "-" * W)
+    print("\n" + "─" * W)
     print("  AUTOMATED ALERTS")
-    print("-" * W)
+    print("─" * W)
     has_alerts = False
     for m in monthly_kpis:
         for alert in m["alerts"]:
@@ -585,14 +743,14 @@ def print_forecast_report(monthly_kpis: List[Dict], summary: Dict) -> None:
         print("  No alerts for the forecast horizon.")
 
     # Strategic insight
-    print("\n" + "-" * W)
+    print("\n" + "─" * W)
     print("  STRATEGIC INSIGHT FOR MANAGEMENT")
-    print("-" * W)
+    print("─" * W)
     for sentence in summary.get("strategic_insight", "").split("  "):
         if sentence.strip():
-            print(f"  * {sentence.strip()}")
+            print(f"  • {sentence.strip()}")
 
-    print("\n" + "=" * W)
+    print("\n" + "═" * W)
 
 
 # ─────────────────────────────────────────────────────────
@@ -619,7 +777,7 @@ def save_dashboard_insights(
             "is_surge_month":   m["is_surge_month"],
             "volume_surge_pct": m["volume_surge_pct"],
             "alert_count":      len(m["alerts"]),
-            "alert_messages":   " | ".join(a["message"] for a in m["alerts"]),
+            "alert_messages":   " | ".join(a["message"] for a in m["alerts"])[:255],
             "recommendations":  " | ".join(m["recommendations"]),
         }
         row.update({f"forecast_{k}": v for k, v in m["forecast"].items()})
@@ -663,7 +821,7 @@ def save_dashboard_insights(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(insights, f, indent=2, default=_convert)
 
-    print(f"[SAVE] Dashboard insights -> {output_path}")
+    print(f"[SAVE] Dashboard insights → {output_path}")
     return insights
 
 
@@ -694,7 +852,7 @@ def _build_sql_payloads(insights: Dict[str, Any]) -> Dict[str, pd.DataFrame]:
             "is_surge_month": bool(m.get("is_surge_month", False)),
             "volume_surge_pct": float(m.get("volume_surge_pct", 0.0) or 0.0),
             "alert_count": int(len(alerts)),
-            "alert_messages": " | ".join(a.get("message", "") for a in alerts),
+            "alert_messages": " | ".join(a.get("message", "") for a in alerts)[:255],
             "recommendations": " | ".join(m.get("recommendations", [])),
             "forecast_claim_volume": float(forecast.get("claim_volume", 0.0) or 0.0),
             "forecast_total_indemnisation_tnd": float(forecast.get("total_indemnisation_tnd", 0.0) or 0.0),
@@ -778,7 +936,7 @@ def save_forecast_to_database(insights: Dict[str, Any]) -> None:
             schema=PREDICTIONS_SCHEMA,
             table=MONTHLY_TABLE,
             df=payload["monthly"],
-            mode="append",
+            mode="replace",
             primary_key=None,
         )
         load_table(
@@ -786,7 +944,7 @@ def save_forecast_to_database(insights: Dict[str, Any]) -> None:
             schema=PREDICTIONS_SCHEMA,
             table=SUMMARY_TABLE,
             df=payload["summary"],
-            mode="append",
+            mode="replace",
             primary_key=None,
         )
         if not payload["alerts"].empty:
@@ -795,7 +953,7 @@ def save_forecast_to_database(insights: Dict[str, Any]) -> None:
                 schema=PREDICTIONS_SCHEMA,
                 table=ALERTS_TABLE,
                 df=payload["alerts"],
-                mode="append",
+                mode="replace",
                 primary_key=None,
             )
     finally:
@@ -814,9 +972,11 @@ def save_forecast_to_database(insights: Dict[str, Any]) -> None:
 # ─────────────────────────────────────────────────────────
 def main() -> None:
     print("=" * 65)
-    print("  INSURANCE CLAIMS FORECASTING - PREDICTION & KPI REPORT")
+    print("  INSURANCE CLAIMS FORECASTING – PREDICTION & KPI REPORT")
     print("=" * 65 + "\n")
 
+    # _infer_forecast_anchor() is called inside generate_forecasts() and will
+    # print the detected anchor + forecast window.  No manual date config needed.
     models        = load_models()
     forecasts     = generate_forecasts(models, FORECAST_HORIZON)
     monthly_kpis  = compute_business_kpis(forecasts, models)

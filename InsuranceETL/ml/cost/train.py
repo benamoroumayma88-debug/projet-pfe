@@ -1,10 +1,8 @@
 """
 ml/cost/train.py
-Train regression model to predict claim cost amounts.
-This model is intended to estimate monthly costs that should be
-reserved for incoming claims.  It uses the unified `claim_cost`
-column produced by the ETL pipeline and trains XGBoost and LightGBM
-regressors, saving the best performing model.
+Train regression model to predict claim indemnisation amounts.
+XGBoost and LightGBM are trained with tuned hyperparameters, compared
+side by side, and the winner (best R²) is saved as the production model.
 """
 
 import pandas as pd
@@ -14,7 +12,6 @@ import sys
 import joblib
 
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
     mean_absolute_error,
     r2_score,
@@ -49,7 +46,6 @@ TARGET_COL = "claim_cost"    # unified target created in ml_builders
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
 CLOSED_STATUSES = ['Clos_avec_indemnisation', 'Clos_sans_indemnisation', 'Refusé']
-SKIP_RF = True  # when True, only XGBoost + LightGBM are trained for cost model
 
 
 def load_data():
@@ -137,51 +133,31 @@ def preprocess_data(df):
 
 
 def train_models(X_train, X_test, y_train, y_test, preprocessor):
-    """Train and evaluate Random Forest / XGBoost / LightGBM regression algorithms."""
-    models = {}
+    """Train and evaluate XGBoost and LightGBM regressors."""
+    models  = {}
     results = {}
     threshold = y_train.median()
     y_test_binary = (y_test > threshold).astype(int)
 
-    if SKIP_RF:
-        print("[TRAIN] SKIP_RF=True, skipping RandomForestRegressor")
-    else:
-        print("[TRAIN] Training RandomForestRegressor...")
-        rf_pipeline = Pipeline([
-            ('preprocessor', preprocessor),
-            ('regressor', RandomForestRegressor(
-                n_estimators=100,
-                max_depth=10,
-                random_state=RANDOM_STATE,
-                n_jobs=-1,
-            ))
-        ])
-        t0 = time.time()
-        rf_pipeline.fit(X_train, y_train)
-        rf_time = time.time() - t0
-        rf_pred = rf_pipeline.predict(X_test)
-        rf_pred_binary = (rf_pred > threshold).astype(int)
-        models['random_forest'] = rf_pipeline
-        results['random_forest'] = {
-            'mae': mean_absolute_error(y_test, rf_pred),
-            'rmse': np.sqrt(mean_squared_error(y_test, rf_pred)),
-            'r2': r2_score(y_test, rf_pred),
-            'auc': roc_auc_score(y_test_binary, rf_pred),
-            'precision': precision_score(y_test_binary, rf_pred_binary, zero_division=0),
-            'accuracy': accuracy_score(y_test_binary, rf_pred_binary),
-            'training_time_s': round(rf_time, 1),
-        }
-        print(f"[TRAIN] RF done ({rf_time:.1f}s)")
-
-    # XGBoost regressor
-    print("[TRAIN] Training XGBRegressor...")
+    # ── 1. XGBoost ───────────────────────────────────────────────
+    print("[TRAIN] Training XGBRegressor ...")
     xgb_pipeline = Pipeline([
         ('preprocessor', preprocessor),
         ('regressor', xgb.XGBRegressor(
-            n_estimators=100,
+            n_estimators=250,
             max_depth=6,
-            learning_rate=0.1,
-            random_state=RANDOM_STATE
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            min_child_weight=5,
+            gamma=0.1,
+            reg_alpha=0.1,
+            reg_lambda=3.0,
+            objective='reg:squarederror',
+            tree_method='hist',
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            verbosity=0,
         ))
     ])
     t0 = time.time()
@@ -191,26 +167,32 @@ def train_models(X_train, X_test, y_train, y_test, preprocessor):
     xgb_pred_binary = (xgb_pred > threshold).astype(int)
     models['xgboost'] = xgb_pipeline
     results['xgboost'] = {
-        'mae': mean_absolute_error(y_test, xgb_pred),
-        'rmse': np.sqrt(mean_squared_error(y_test, xgb_pred)),
-        'r2': r2_score(y_test, xgb_pred),
-        'auc': roc_auc_score(y_test_binary, xgb_pred),
-        'precision': precision_score(y_test_binary, xgb_pred_binary, zero_division=0),
-        'accuracy': accuracy_score(y_test_binary, xgb_pred_binary),
+        'mae':             mean_absolute_error(y_test, xgb_pred),
+        'rmse':            np.sqrt(mean_squared_error(y_test, xgb_pred)),
+        'r2':              r2_score(y_test, xgb_pred),
+        'auc':             roc_auc_score(y_test_binary, xgb_pred),
+        'precision':       precision_score(y_test_binary, xgb_pred_binary, zero_division=0),
+        'accuracy':        accuracy_score(y_test_binary, xgb_pred_binary),
         'training_time_s': round(xgb_time, 1),
     }
-    print(f"[TRAIN] XGB done ({xgb_time:.1f}s)")
+    print(f"[TRAIN] XGBoost done  R²={results['xgboost']['r2']:.4f}  ({xgb_time:.1f}s)")
 
-    # LightGBM regressor
-    print("[TRAIN] Training LGBMRegressor...")
+    # ── 2. LightGBM ──────────────────────────────────────────────
+    print("[TRAIN] Training LGBMRegressor ...")
     lgb_pipeline = Pipeline([
         ('preprocessor', preprocessor),
         ('regressor', lgb.LGBMRegressor(
-            n_estimators=100,
+            n_estimators=300,
             max_depth=7,
-            learning_rate=0.1,
+            learning_rate=0.05,
             num_leaves=31,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            min_child_weight=5,
+            reg_alpha=0.1,
+            reg_lambda=3.0,
             random_state=RANDOM_STATE,
+            n_jobs=-1,
             verbose=-1,
         ))
     ])
@@ -221,15 +203,15 @@ def train_models(X_train, X_test, y_train, y_test, preprocessor):
     lgb_pred_binary = (lgb_pred > threshold).astype(int)
     models['lightgbm'] = lgb_pipeline
     results['lightgbm'] = {
-        'mae': mean_absolute_error(y_test, lgb_pred),
-        'rmse': np.sqrt(mean_squared_error(y_test, lgb_pred)),
-        'r2': r2_score(y_test, lgb_pred),
-        'auc': roc_auc_score(y_test_binary, lgb_pred),
-        'precision': precision_score(y_test_binary, lgb_pred_binary, zero_division=0),
-        'accuracy': accuracy_score(y_test_binary, lgb_pred_binary),
+        'mae':             mean_absolute_error(y_test, lgb_pred),
+        'rmse':            np.sqrt(mean_squared_error(y_test, lgb_pred)),
+        'r2':              r2_score(y_test, lgb_pred),
+        'auc':             roc_auc_score(y_test_binary, lgb_pred),
+        'precision':       precision_score(y_test_binary, lgb_pred_binary, zero_division=0),
+        'accuracy':        accuracy_score(y_test_binary, lgb_pred_binary),
         'training_time_s': round(lgb_time, 1),
     }
-    print(f"[TRAIN] LGB done ({lgb_time:.1f}s)")
+    print(f"[TRAIN] LightGBM done R²={results['lightgbm']['r2']:.4f}  ({lgb_time:.1f}s)")
 
     return models, results
 
@@ -237,51 +219,53 @@ def train_models(X_train, X_test, y_train, y_test, preprocessor):
 def save_models(models, results):
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    model_labels = {
-        'xgboost': 'XGBoost',
-        'lightgbm': 'LightGBM',
-    }
-    if not SKIP_RF:
-        model_labels['random_forest'] = 'Random Forest'
+    W = 104
+    LABELS = {'xgboost': 'XGBoost', 'lightgbm': 'LightGBM'}
 
-    # Side-by-side comparison table
-    print("\n" + "="*100)
-    print(f"  {'MODEL':<18} {'MAE':>10}  {'RMSE':>10}  {'R²':>8}  {'AUC':>8}  {'Precision':>10}  {'Accuracy':>10}  {'Time':>7}")
-    print("-"*100)
-    for key in ['random_forest', 'xgboost', 'lightgbm']:
+    # ── Detailed comparison table ─────────────────────────────────
+    print("\n" + "═" * W)
+    print("  COST PREDICTION — MODEL COMPARISON  (XGBoost  vs  LightGBM)")
+    print("═" * W)
+    print(
+        f"  {'Model':<14}  {'MAE (TND)':>10}  {'RMSE (TND)':>11}  {'R²':>8}  "
+        f"{'AUC':>8}  {'Precision':>10}  {'Accuracy':>10}  {'Train Time':>11}"
+    )
+    print("─" * W)
+    for key in ['xgboost', 'lightgbm']:
         if key not in results:
             continue
         res = results[key]
-        t = res.get('training_time_s', 0)
+        t   = res.get('training_time_s', 0)
         print(
-            f"  {model_labels[key]:<18} {res['mae']:>10.2f}  {res['rmse']:>10.2f}  "
-            f"{res['r2']:>8.4f}  {res['auc']:>8.4f}  {res['precision']:>10.4f}  {res['accuracy']:>10.4f}  {t:>6.1f}s"
+            f"  {LABELS[key]:<14}  {res['mae']:>10.2f}  {res['rmse']:>11.2f}  {res['r2']:>8.4f}  "
+            f"{res['auc']:>8.4f}  {res['precision']:>10.4f}  {res['accuracy']:>10.4f}  {t:>10.1f}s"
         )
-    print("="*100)
+    print("═" * W)
 
-    # choose best model by R² score (primary regression metric)
-    candidate_keys = ['xgboost', 'lightgbm']
-    if not SKIP_RF:
-        candidate_keys.insert(0, 'random_forest')
-    candidate_keys = [k for k in candidate_keys if k in results]
+    best_name  = max(results, key=lambda k: results[k]['r2'])
+    other_name = [k for k in results if k != best_name][0]
+    r2_diff    = results[best_name]['r2'] - results[other_name]['r2']
+    print(
+        f"  ► WINNER : {LABELS[best_name]}  "
+        f"(R² {results[best_name]['r2']:.4f}  ·  +{r2_diff:.4f} vs {LABELS[other_name]})  "
+        f"·  MAE {results[best_name]['mae']:.2f} TND"
+    )
+    print("═" * W + "\n")
 
-    best_name = max(candidate_keys, key=lambda k: results[k]['r2'])
-    best_model = models[best_name]
-    print(f"  >>> BEST MODEL: {model_labels[best_name]} (R²={results[best_name]['r2']:.4f}, AUC={results[best_name]['auc']:.4f})")
-    print("="*90)
-
-    joblib.dump(best_model, os.path.join(MODEL_DIR, 'cost_prediction_model.pkl'))
+    # Save individual models and metadata
     for name, model in models.items():
         joblib.dump(model, os.path.join(MODEL_DIR, f"{name}_model.pkl"))
-    joblib.dump(results, os.path.join(MODEL_DIR, 'model_results.pkl'))
 
-    # Save metadata for predict.py
+    best_model = models[best_name]
+    joblib.dump(best_model, os.path.join(MODEL_DIR, 'cost_prediction_model.pkl'))
+    joblib.dump(results,    os.path.join(MODEL_DIR, 'model_results.pkl'))
+
     metadata = {
-        'best_model_name': best_name,
-        'results_summary': {k: {m: round(v, 4) for m, v in res.items()} for k, res in results.items()},
+        'best_model_name':  best_name,
+        'results_summary':  {k: {m: round(v, 4) for m, v in res.items()} for k, res in results.items()},
     }
     joblib.dump(metadata, os.path.join(MODEL_DIR, 'model_metadata.pkl'))
-    print(f"[SAVE] Models saved. Production model: cost_prediction_model.pkl ({model_labels[best_name]})")
+    print(f"[SAVE] Production model → cost_prediction_model.pkl  ({LABELS[best_name]})")
 
 
 def main():

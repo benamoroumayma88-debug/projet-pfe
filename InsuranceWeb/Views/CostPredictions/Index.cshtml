@@ -43,41 +43,15 @@
         </div>
     </div>
 
-    <!-- ═══ Charts ═══ -->
-    <div class="grid-2">
-        <div class="panel">
-            <div class="panel-header">&#x1F4CA; Cost Risk Distribution</div>
-            <div class="panel-body">
-                <div class="chart-container">
-                    <canvas id="costDoughnut"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="panel">
-            <div class="panel-header">&#x1F4B5; Risk Breakdown</div>
-            <div class="panel-body">
-                @{
-                    int totalRisk = Model.HighCostCount + Model.MediumCostCount + Model.LowCostCount;
-                }
-                <div style="margin-bottom:.75rem;display:flex;justify-content:space-between;font-size:.85rem;">
-                    <span><span class="badge-risk badge-high">High</span> @Model.HighCostCount claims</span>
-                    <span><span class="badge-risk badge-medium">Medium</span> @Model.MediumCostCount claims</span>
-                    <span><span class="badge-risk badge-low">Low</span> @Model.LowCostCount claims</span>
-                </div>
-                <div class="risk-bar" style="height:36px;">
-                    @if (totalRisk > 0)
-                    {
-                        <div class="segment seg-high" style="flex:@Model.HighCostCount;">@((totalRisk > 0 ? (double)Model.HighCostCount / totalRisk * 100 : 0).ToString("F1"))%</div>
-                        <div class="segment seg-medium" style="flex:@Model.MediumCostCount;">@((totalRisk > 0 ? (double)Model.MediumCostCount / totalRisk * 100 : 0).ToString("F1"))%</div>
-                        <div class="segment seg-low" style="flex:@Model.LowCostCount;">@((totalRisk > 0 ? (double)Model.LowCostCount / totalRisk * 100 : 0).ToString("F1"))%</div>
-                    }
-                </div>
-                <div style="margin-top:1.5rem;">
-                    <div class="chart-container">
-                        <canvas id="costBar"></canvas>
-                    </div>
-                </div>
-            </div>
+    <!-- ═══ Power BI Dashboard ═══ -->
+    <div class="panel">
+        <div class="panel-header">&#x1F4B0; Cost Predictions Report</div>
+        <div class="panel-body p-0">
+            <iframe title="Power BI Cost Report"
+                    src="https://app.powerbi.com/reportEmbed?reportId=ad2898aa-7ff2-4fbe-b0fb-dd00ad991814&autoAuth=true&ctid=119689b1-4b51-43b0-9c27-34e6c9279d98"
+                    style="width:100%;height:780px;border:none;display:block;"
+                    allowfullscreen="true">
+            </iframe>
         </div>
     </div>
 }
@@ -201,53 +175,3 @@
     </div>
 }
 
-@section Scripts {
-    @if (Model.Summary != null)
-    {
-        <script>
-            (function () {
-                // Doughnut: Cost risk distribution
-                new Chart(document.getElementById('costDoughnut').getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['High (>@(Model.Summary.CostThresholdTnd.ToString("N0")) TND)', 'Medium', 'Low'],
-                        datasets: [{
-                            data: [@Model.HighCostCount, @Model.MediumCostCount, @Model.LowCostCount],
-                            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
-                            borderWidth: 0,
-                            hoverOffset: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '60%',
-                        plugins: {
-                            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } }
-                        }
-                    }
-                });
-
-                // Bar: Cost risk breakdown
-                new Chart(document.getElementById('costBar').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: ['High', 'Medium', 'Low'],
-                        datasets: [{
-                            data: [@Model.HighCostCount, @Model.MediumCostCount, @Model.LowCostCount],
-                            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
-                            borderRadius: 6,
-                            barThickness: 48
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Claims' } } }
-                    }
-                });
-            })();
-        </script>
-    }
-}

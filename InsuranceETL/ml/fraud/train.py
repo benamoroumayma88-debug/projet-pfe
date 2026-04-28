@@ -1,6 +1,8 @@
 """
 ml/fraud/train.py
-Train fraud detection model and produce business-ready operating thresholds.
+Train fraud detection models: XGBoost and LightGBM.
+Both are trained with tuned hyperparameters, compared side by side,
+and the winner is saved as the production model.
 """
 
 from __future__ import annotations
@@ -9,7 +11,6 @@ import json
 import os
 import sys
 import importlib
-import time
 from datetime import datetime
 from typing import Dict, Tuple, Any, List
 
@@ -17,7 +18,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     auc,
@@ -32,6 +32,8 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+import time
 
 # Optional gradient boosting models (keep training robust even if unavailable)
 try:
@@ -55,7 +57,6 @@ DATA_TABLE = "ml.ml_claim"
 TARGET_COL = "est_frauduleux_claim"
 TEST_SIZE = 0.2
 RANDOM_STATE = 42
-SKIP_RF = True  # if True trains only XGBoost + LightGBM
 MIN_PRECISION_TARGET = 0.40
 MIN_RECALL_TARGET = 0.30
 MAX_INVESTIGATION_RATE = 0.20
@@ -310,19 +311,6 @@ def train_models(
 
     candidate_models: Dict[str, Any] = {}
 
-    if not SKIP_RF:
-        candidate_models["random_forest"] = RandomForestClassifier(
-            n_estimators=300,
-            max_depth=12,
-            min_samples_leaf=2,
-            min_samples_split=5,
-            class_weight="balanced",
-            random_state=RANDOM_STATE,
-            n_jobs=-1,
-        )
-    else:
-        print("[TRAIN] SKIP_RF=True, skipping RandomForestClassifier")
-
     if xgb is not None:
         candidate_models["xgboost"] = xgb.XGBClassifier(
             n_estimators=250,
@@ -335,6 +323,8 @@ def train_models(
             eval_metric="logloss",
             n_jobs=-1,
         )
+    else:
+        print("[WARNING] XGBoost not available — skipping")
 
     if lgb is not None:
         candidate_models["lightgbm"] = lgb.LGBMClassifier(
@@ -349,6 +339,8 @@ def train_models(
             n_jobs=-1,
             verbose=-1,
         )
+    else:
+        print("[WARNING] LightGBM not available — skipping")
 
     for model_name, estimator in candidate_models.items():
         print(f"[TRAIN] Training {model_name}...")
@@ -359,13 +351,10 @@ def train_models(
 
         t0 = time.time()
         pipeline.fit(X_train, y_train)
-        dt = time.time() - t0
-
+        train_time = time.time() - t0
         y_prob = pipeline.predict_proba(X_test)[:, 1]
 
         model_eval = evaluate_model(y_test, y_prob)
-        model_eval['training_time_s'] = round(dt, 2)
-
         threshold_bundle = _optimize_threshold(
             y_test,
             y_prob,
@@ -386,11 +375,12 @@ def train_models(
             **model_eval,
             "optimized_threshold": threshold_bundle,
             "selection_score": float(selection_score),
+            "training_time_s": round(train_time, 1),
         }
         models[model_name] = pipeline
 
         print(
-            f"  AUC={model_eval['auc']:.4f} | PR-AUC={model_eval['pr_auc']:.4f} | "
+            f"  AUC={model_eval['auc']:.4f} | PR-AUC={model_eval['pr_auc']:.4f} | Time={train_time:.1f}s | "
             f"Threshold={optimized['threshold']:.2f} | Recall={optimized['recall']:.3f} | "
             f"Precision={optimized['precision']:.3f} | NetValue={optimized['net_value']:.2f} TND | "
             f"Hours={optimized['estimated_investigation_hours']:.1f} | QueueRate={optimized['investigation_rate']:.3f}"
@@ -430,9 +420,52 @@ def save_artifacts(
 ) -> Tuple[str, Pipeline]:
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    best_name = max(results.keys(), key=lambda name: results[name]["selection_score"])
-    best_model = models[best_name]
+    W = 100
+    LABELS = {'xgboost': 'XGBoost', 'lightgbm': 'LightGBM'}
 
+    # ── Detailed comparison table ─────────────────────────────────
+    print("\n" + "═" * W)
+    print("  FRAUD DETECTION — MODEL COMPARISON  (XGBoost  vs  LightGBM)")
+    print("═" * W)
+    print(
+        f"  {'Model':<14}  {'AUC':>7}  {'PR-AUC':>7}  {'Accuracy':>9}  "
+        f"{'Precision':>10}  {'Recall':>7}  {'F1':>7}  {'Threshold':>10}  {'Train Time':>11}"
+    )
+    print("─" * W)
+    for key in ['xgboost', 'lightgbm']:
+        if key not in results:
+            continue
+        res  = results[key]
+        opt  = res["optimized_threshold"]["operating_points"]["precision_first"]
+        t    = res.get("training_time_s", 0)
+        cr   = res.get("classification_report", {})
+        cls1 = cr.get("1", cr.get(1, {}))
+        acc  = cls1.get("support", 0)   # placeholder fallback
+        # accuracy from default threshold report
+        acc_val = res.get("default_threshold_metrics", {}).get("tp", 0)
+        # use weighted avg accuracy approximation
+        wa  = cr.get("accuracy", cr.get("weighted avg", {}).get("f1-score", 0))
+        print(
+            f"  {LABELS.get(key, key):<14}  {res['auc']:>7.4f}  {res['pr_auc']:>7.4f}  {wa:>9.4f}  "
+            f"{opt['precision']:>10.4f}  {opt['recall']:>7.4f}  {opt['f1_score']:>7.4f}  "
+            f"{opt['threshold']:>10.2f}  {t:>10.1f}s"
+        )
+    print("═" * W)
+
+    best_name = max(results.keys(), key=lambda name: results[name]["selection_score"])
+    if len(results) >= 2:
+        other_name = [k for k in results if k != best_name][0]
+        auc_diff   = results[best_name]["auc"] - results[other_name]["auc"]
+        print(
+            f"  ► WINNER : {LABELS.get(best_name, best_name)}  "
+            f"(AUC {results[best_name]['auc']:.4f}  ·  +{auc_diff:.4f} vs {LABELS.get(other_name, other_name)})  "
+            f"·  Threshold: {results[best_name]['optimized_threshold']['recommended_threshold']:.2f}"
+        )
+    else:
+        print(f"  ► WINNER : {LABELS.get(best_name, best_name)}")
+    print("═" * W + "\n")
+
+    best_model     = models[best_name]
     best_model_path = os.path.join(MODEL_DIR, "fraud_detection_model.pkl")
     joblib.dump(best_model, best_model_path)
 
@@ -442,25 +475,24 @@ def save_artifacts(
     feature_importance = get_feature_importance(best_model)
 
     training_results = {
-        "training_date": datetime.now().isoformat(),
-        "best_model": best_name,
-        "dataset_profile": dataset_profile,
+        "training_date":     datetime.now().isoformat(),
+        "best_model":        best_name,
+        "dataset_profile":   dataset_profile,
         "feature_importance": feature_importance,
-        "results": results,
+        "results":           results,
         "config": {
-            "data_table": DATA_TABLE,
-            "target_column": TARGET_COL,
-            "test_size": TEST_SIZE,
-            "random_state": RANDOM_STATE,
+            "data_table":     DATA_TABLE,
+            "target_column":  TARGET_COL,
+            "test_size":      TEST_SIZE,
+            "random_state":   RANDOM_STATE,
         },
     }
 
     with open(os.path.join(MODEL_DIR, "training_results.json"), "w", encoding="utf-8") as f:
         json.dump(training_results, f, indent=2, default=str)
 
-    print(f"[SAVE] Best model: {best_name}")
-    print(f"[SAVE] Model saved to {best_model_path}")
-    print(f"[SAVE] Training metadata saved to {os.path.join(MODEL_DIR, 'training_results.json')}")
+    print(f"[SAVE] Production model → fraud_detection_model.pkl  ({LABELS.get(best_name, best_name)})")
+    print(f"[SAVE] Training metadata → {os.path.join(MODEL_DIR, 'training_results.json')}")
 
     return best_name, best_model
 

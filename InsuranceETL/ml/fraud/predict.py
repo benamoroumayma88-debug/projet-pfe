@@ -32,6 +32,8 @@ PREDICTIONS_TABLE = "claim_fraud_predictions"
 SUMMARY_TABLE = "claim_fraud_summary"
 PRIORITY_CASES_TABLE = "claim_fraud_priority_cases"
 
+ACTIVE_STATUSES = ["Ouvert", "En_cours", "En_cours_d_expertise"]
+
 # Agent cost calculation (Tunisia - TND)
 AGENT_MONTHLY_SALARY = 3000.0  # TND
 AGENT_MONTHLY_WORKING_HOURS = 160.0  # hours
@@ -138,12 +140,20 @@ def predict_fraud(df: pd.DataFrame, model: Any, threshold: float) -> pd.DataFram
     out["estimated_investigation_hours"] = out["fraud_probability"].apply(_estimate_case_hours)
     out["estimated_investigation_cost_tnd"] = out["estimated_investigation_hours"] * AGENT_HOURLY_RATE
 
-    out["risk_level"] = pd.cut(
-        out["fraud_probability"],
-        bins=[0.0, 0.30, 0.60, 0.85, 1.0],
-        labels=["Low", "Medium", "High", "Critical"],
-        include_lowest=True,
-    )
+    # Risk levels derived FROM threshold for coherence:
+    #   Critical = prob >= threshold       (= predicted fraud)
+    #   High     = prob >= threshold * 0.7
+    #   Medium   = prob >= threshold * 0.4
+    #   Low      = below
+    high_cutoff = round(threshold * 0.7, 4)
+    medium_cutoff = round(threshold * 0.4, 4)
+    conditions = [
+        out["fraud_probability"] >= threshold,
+        out["fraud_probability"] >= high_cutoff,
+        out["fraud_probability"] >= medium_cutoff,
+    ]
+    choices = ["Critical", "High", "Medium"]
+    out["risk_level"] = np.select(conditions, choices, default="Low")
 
     action_map = {
         "Critical": "Escalate: SIU review within 24h",
@@ -151,7 +161,7 @@ def predict_fraud(df: pd.DataFrame, model: Any, threshold: float) -> pd.DataFram
         "Medium": "Desk review if capacity allows",
         "Low": "Straight-through processing",
     }
-    out["recommended_action"] = out["risk_level"].astype(str).map(action_map)
+    out["recommended_action"] = out["risk_level"].map(action_map)
 
     return out
 
@@ -168,13 +178,7 @@ def calculate_kpis(predictions: pd.DataFrame, metadata: Dict[str, Any], threshol
 
     scored_count = len(predictions)
     flagged = predictions[predictions["predicted_fraud"] == 1].copy()
-    total_investigation_hours = float(predictions[predictions["predicted_fraud"] == 1]["estimated_investigation_hours"].sum())
-
-    high_or_critical_mask = predictions["risk_level"].astype(str).isin(["High", "Critical"])
-    critical_mask = predictions["risk_level"].astype(str) == "Critical"
-
-    expected_fraud_cases = float(predictions["fraud_probability"].sum())
-    flagged_expected_true_fraud = float(flagged["fraud_probability"].sum()) if len(flagged) else 0.0
+    total_investigation_hours = float(flagged["estimated_investigation_hours"].sum())
 
     if amount_col:
         amounts = predictions[amount_col].fillna(0)
@@ -182,79 +186,41 @@ def calculate_kpis(predictions: pd.DataFrame, metadata: Dict[str, Any], threshol
 
         expected_fraud_exposure_total = float((predictions["fraud_probability"] * amounts).sum())
         expected_preventable_loss = float((flagged["fraud_probability"] * flagged_amounts).sum() * prevented_loss_ratio) if len(flagged) else 0.0
-        avg_ticket_in_queue = float(flagged_amounts.mean()) if len(flagged) else 0.0
     else:
         expected_fraud_exposure_total = 0.0
         expected_preventable_loss = 0.0
-        avg_ticket_in_queue = 0.0
 
     expected_review_cost = float(flagged["estimated_investigation_hours"].sum() * agent_hourly_rate) if len(flagged) > 0 else 0.0
     expected_net_savings = float(expected_preventable_loss - expected_review_cost)
     expected_roi = float(expected_net_savings / expected_review_cost) if expected_review_cost > 0 else 0.0
-
-    top_5pct = max(1, int(np.ceil(0.05 * scored_count))) if scored_count else 0
-    top_10pct = max(1, int(np.ceil(0.10 * scored_count))) if scored_count else 0
-    sorted_pred = predictions.sort_values("fraud_probability", ascending=False)
-
-    top5 = sorted_pred.head(top_5pct) if top_5pct else sorted_pred.iloc[0:0]
-    top10 = sorted_pred.head(top_10pct) if top_10pct else sorted_pred.iloc[0:0]
-
-    precision_at_top_5pct = float(top5["fraud_probability"].mean()) if len(top5) else 0.0
-    precision_at_top_10pct = float(top10["fraud_probability"].mean()) if len(top10) else 0.0
-    capture_rate_top_10pct = float(top10["fraud_probability"].sum() / expected_fraud_cases) if expected_fraud_cases > 0 else 0.0
 
     risk_distribution = {
         str(k): int(v)
         for k, v in predictions["risk_level"].value_counts(dropna=False).to_dict().items()
     }
 
-    # Requested business KPIs (English labels)
-    high_risk_claim_rate = float(high_or_critical_mask.mean()) if scored_count else 0.0
-    average_predictive_risk_score = float(predictions["fraud_probability"].mean()) if scored_count else 0.0
-    managerial_intervention_rate = float(critical_mask.mean()) if scored_count else 0.0
-    suspected_fraud_claim_rate = float((predictions["predicted_fraud"] == 1).mean()) if scored_count else 0.0
-
     return {
-        "currency": "TND (Tunisian Dinar)",
         "run_timestamp": datetime.now().isoformat(),
         "threshold_used": float(threshold),
         "total_scored_claims": int(scored_count),
         "flagged_for_investigation": int(len(flagged)),
-        "investigation_load_rate": float(len(flagged) / scored_count) if scored_count else 0.0,
-        "expected_fraud_cases_total": expected_fraud_cases,
-        "expected_true_fraud_in_queue": flagged_expected_true_fraud,
+        "total_investigation_hours": total_investigation_hours,
         "expected_fraud_exposure_total": expected_fraud_exposure_total,
         "expected_preventable_loss": expected_preventable_loss,
         "expected_review_cost": expected_review_cost,
         "expected_net_savings": expected_net_savings,
         "expected_roi": expected_roi,
-        "total_investigation_hours": total_investigation_hours,
-        "precision_at_top_5pct": precision_at_top_5pct,
-        "precision_at_top_10pct": precision_at_top_10pct,
-        "capture_rate_top_10pct": capture_rate_top_10pct,
-        "avg_ticket_size_in_queue": avg_ticket_in_queue,
         "risk_distribution": risk_distribution,
-        "high_risk_claim_rate": high_risk_claim_rate,
-        "average_predictive_risk_score": average_predictive_risk_score,
-        "managerial_intervention_rate": managerial_intervention_rate,
-        "suspected_fraud_claim_rate": suspected_fraud_claim_rate,
         "assumptions": {
             "prevented_loss_ratio": prevented_loss_ratio,
-            "agent_monthly_salary": AGENT_MONTHLY_SALARY,
-            "agent_monthly_working_hours": AGENT_MONTHLY_WORKING_HOURS,
             "agent_hourly_rate": agent_hourly_rate,
-            "base_investigation_hours": BASE_INVESTIGATION_HOURS,
-            "max_investigation_hours": MAX_INVESTIGATION_HOURS,
             "amount_column": amount_col,
         },
     }
 
 
 def build_dashboard_payload(predictions: pd.DataFrame, kpis: Dict[str, Any]) -> Dict[str, Any]:
-    top_cases = predictions.sort_values("fraud_probability", ascending=False).head(25).copy()
-    top_risk_cases_20 = predictions.sort_values("fraud_probability", ascending=False).head(20).copy()
-    critical_cases = predictions[predictions["risk_level"].astype(str) == "Critical"].copy()
-    critical_cases_to_monitor = critical_cases.sort_values("fraud_probability", ascending=False).head(20)
+    top_cases = predictions.sort_values("fraud_probability", ascending=False).head(20).copy()
 
     desired_cols = [
         "claim_id",
@@ -277,8 +243,6 @@ def build_dashboard_payload(predictions: pd.DataFrame, kpis: Dict[str, Any]) -> 
     return {
         "summary": kpis,
         "top_suspicious_claims": top_cases[available_cols].to_dict("records"),
-        "top_risk_cases_20": top_risk_cases_20[available_cols].to_dict("records"),
-        "critical_cases_to_monitor": critical_cases_to_monitor[available_cols].to_dict("records"),
     }
 
 
@@ -289,20 +253,13 @@ def build_prediction_records(
     threshold: float,
     run_id: str,
     scored_at: datetime,
+    prediction_month: int,
 ) -> pd.DataFrame:
     amount_col = kpis.get("assumptions", {}).get("amount_column")
 
     records = predictions.copy()
-    records.insert(0, "prediction_record_id", [str(uuid.uuid4()) for _ in range(len(records))])
-    records.insert(1, "prediction_run_id", run_id)
-    records.insert(2, "scored_at", scored_at)
-
-    records["model_name"] = metadata.get("best_model", "unknown")
-    records["decision_threshold"] = float(threshold)
-    records["currency"] = "TND"
-    records["high_risk_flag"] = records["risk_level"].astype(str).isin(["High", "Critical"]).astype(int)
-    records["managerial_intervention_required"] = (records["risk_level"].astype(str) == "Critical").astype(int)
-    records["suspected_fraud_flag"] = records["predicted_fraud"].astype(int)
+    records.insert(0, "prediction_run_id", run_id)
+    records.insert(1, "scored_at", scored_at)
 
     if amount_col and amount_col in records.columns:
         amount_values = pd.to_numeric(records[amount_col], errors="coerce").fillna(0.0)
@@ -318,13 +275,14 @@ def build_prediction_records(
         records["expected_fraud_exposure_claim_tnd"] = 0.0
         records["expected_preventable_loss_claim_tnd"] = 0.0
 
+    # Add unique per-row identifier and prediction month (matches cost/delay model structure)
+    records.insert(0, "prediction_record_id", [str(uuid.uuid4()) for _ in range(len(records))])
+    records["prediction_month"] = prediction_month
+
     preferred_cols = [
         "prediction_record_id",
         "prediction_run_id",
         "scored_at",
-        "model_name",
-        "decision_threshold",
-        "currency",
         "claim_id",
         "client_id",
         "contract_id",
@@ -337,19 +295,17 @@ def build_prediction_records(
         "risk_level",
         "recommended_action",
         "predicted_fraud",
-        "suspected_fraud_flag",
-        "high_risk_flag",
-        "managerial_intervention_required",
         "estimated_investigation_hours",
         "estimated_investigation_cost_tnd",
         "claim_amount_tnd",
         "expected_fraud_exposure_claim_tnd",
         "expected_preventable_loss_claim_tnd",
+        "prediction_month",
     ]
     available_cols = [col for col in preferred_cols if col in records.columns]
     records = records[available_cols].copy()
 
-    for col in ["risk_level", "recommended_action", "model_name", "currency", "statut_sinistre_claim", "type_sinistre_claim"]:
+    for col in ["risk_level", "recommended_action", "statut_sinistre_claim", "type_sinistre_claim"]:
         if col in records.columns:
             records[col] = records[col].astype(str)
 
@@ -361,39 +317,28 @@ def build_summary_record(
     metadata: Dict[str, Any],
     run_id: str,
     scored_at: datetime,
+    projection_month: int,
 ) -> pd.DataFrame:
     risk_distribution = kpis.get("risk_distribution", {})
 
     summary_row = {
-        "summary_record_id": str(uuid.uuid4()),
         "prediction_run_id": run_id,
         "scored_at": scored_at,
         "model_name": metadata.get("best_model", "unknown"),
-        "currency": kpis.get("currency", "TND (Tunisian Dinar)"),
         "threshold_used": float(kpis.get("threshold_used", 0.0) or 0.0),
         "total_scored_claims": int(kpis.get("total_scored_claims", 0) or 0),
         "flagged_for_investigation": int(kpis.get("flagged_for_investigation", 0) or 0),
-        "investigation_load_rate": float(kpis.get("investigation_load_rate", 0.0) or 0.0),
         "total_investigation_hours": float(kpis.get("total_investigation_hours", 0.0) or 0.0),
-        "expected_fraud_cases_total": float(kpis.get("expected_fraud_cases_total", 0.0) or 0.0),
-        "expected_true_fraud_in_queue": float(kpis.get("expected_true_fraud_in_queue", 0.0) or 0.0),
         "expected_fraud_exposure_total_tnd": float(kpis.get("expected_fraud_exposure_total", 0.0) or 0.0),
         "expected_preventable_loss_tnd": float(kpis.get("expected_preventable_loss", 0.0) or 0.0),
         "expected_review_cost_tnd": float(kpis.get("expected_review_cost", 0.0) or 0.0),
         "expected_net_savings_tnd": float(kpis.get("expected_net_savings", 0.0) or 0.0),
         "expected_roi": float(kpis.get("expected_roi", 0.0) or 0.0),
-        "precision_at_top_5pct": float(kpis.get("precision_at_top_5pct", 0.0) or 0.0),
-        "precision_at_top_10pct": float(kpis.get("precision_at_top_10pct", 0.0) or 0.0),
-        "capture_rate_top_10pct": float(kpis.get("capture_rate_top_10pct", 0.0) or 0.0),
-        "avg_ticket_size_in_queue_tnd": float(kpis.get("avg_ticket_size_in_queue", 0.0) or 0.0),
-        "high_risk_claim_rate": float(kpis.get("high_risk_claim_rate", 0.0) or 0.0),
-        "average_predictive_risk_score": float(kpis.get("average_predictive_risk_score", 0.0) or 0.0),
-        "managerial_intervention_rate": float(kpis.get("managerial_intervention_rate", 0.0) or 0.0),
-        "suspected_fraud_claim_rate": float(kpis.get("suspected_fraud_claim_rate", 0.0) or 0.0),
         "low_risk_count": int(risk_distribution.get("Low", 0) or 0),
         "medium_risk_count": int(risk_distribution.get("Medium", 0) or 0),
         "high_risk_count": int(risk_distribution.get("High", 0) or 0),
         "critical_risk_count": int(risk_distribution.get("Critical", 0) or 0),
+        "projection_month": projection_month,
     }
 
     return pd.DataFrame([summary_row])
@@ -401,51 +346,41 @@ def build_summary_record(
 
 def build_priority_case_records(
     predictions: pd.DataFrame,
-    metadata: Dict[str, Any],
-    threshold: float,
     run_id: str,
     scored_at: datetime,
 ) -> pd.DataFrame:
+    """Build a single ranked investigation queue — top 20 claims by fraud probability."""
     top_risk_cases = predictions.sort_values("fraud_probability", ascending=False).head(20).copy()
-    top_risk_cases["priority_list_type"] = "TOP_20_RISK"
 
-    critical_cases = predictions[predictions["risk_level"].astype(str) == "Critical"].copy()
-    critical_cases = critical_cases.sort_values("fraud_probability", ascending=False).head(20)
-    critical_cases["priority_list_type"] = "CRITICAL_TO_MONITOR"
-
-    priority_df = pd.concat([top_risk_cases, critical_cases], ignore_index=True)
-    if priority_df.empty:
+    if top_risk_cases.empty:
         return pd.DataFrame(
             columns=[
-                "priority_case_record_id", "prediction_run_id", "scored_at", "model_name",
-                "decision_threshold", "priority_list_type", "priority_rank", "claim_id",
+                "prediction_run_id", "scored_at",
+                "priority_rank", "claim_id",
                 "client_id", "contract_id", "fraud_probability", "risk_level",
                 "recommended_action", "predicted_fraud", "estimated_investigation_hours",
                 "estimated_investigation_cost_tnd"
             ]
         )
 
-    priority_df.insert(0, "priority_case_record_id", [str(uuid.uuid4()) for _ in range(len(priority_df))])
-    priority_df.insert(1, "prediction_run_id", run_id)
-    priority_df.insert(2, "scored_at", scored_at)
-    priority_df["model_name"] = metadata.get("best_model", "unknown")
-    priority_df["decision_threshold"] = float(threshold)
-    priority_df["priority_rank"] = priority_df.groupby("priority_list_type")["fraud_probability"].rank(method="first", ascending=False).astype(int)
+    top_risk_cases.insert(0, "prediction_run_id", run_id)
+    top_risk_cases.insert(1, "scored_at", scored_at)
+    top_risk_cases["priority_rank"] = range(1, len(top_risk_cases) + 1)
 
     keep_cols = [
-        "priority_case_record_id", "prediction_run_id", "scored_at", "model_name", "decision_threshold",
-        "priority_list_type", "priority_rank", "claim_id", "client_id", "contract_id",
+        "prediction_run_id", "scored_at",
+        "priority_rank", "claim_id", "client_id", "contract_id",
         "fraud_probability", "risk_level", "recommended_action", "predicted_fraud",
         "estimated_investigation_hours", "estimated_investigation_cost_tnd"
     ]
-    available_cols = [col for col in keep_cols if col in priority_df.columns]
-    priority_df = priority_df[available_cols].copy()
+    available_cols = [col for col in keep_cols if col in top_risk_cases.columns]
+    top_risk_cases = top_risk_cases[available_cols].copy()
 
-    for col in ["priority_list_type", "risk_level", "recommended_action", "model_name"]:
-        if col in priority_df.columns:
-            priority_df[col] = priority_df[col].astype(str)
+    for col in ["risk_level", "recommended_action"]:
+        if col in top_risk_cases.columns:
+            top_risk_cases[col] = top_risk_cases[col].astype(str)
 
-    return priority_df
+    return top_risk_cases
 
 
 def save_predictions_to_database(
@@ -453,13 +388,14 @@ def save_predictions_to_database(
     kpis: Dict[str, Any],
     metadata: Dict[str, Any],
     threshold: float,
+    pred_month: int,
 ) -> None:
     run_id = datetime.now().strftime("FRD-%Y%m%d-%H%M%S")
     scored_at = datetime.now()
 
-    prediction_records = build_prediction_records(predictions, kpis, metadata, threshold, run_id, scored_at)
-    summary_record = build_summary_record(kpis, metadata, run_id, scored_at)
-    priority_case_records = build_priority_case_records(predictions, metadata, threshold, run_id, scored_at)
+    prediction_records = build_prediction_records(predictions, kpis, metadata, threshold, run_id, scored_at, pred_month)
+    summary_record = build_summary_record(kpis, metadata, run_id, scored_at, pred_month)
+    priority_case_records = build_priority_case_records(predictions, run_id, scored_at)
 
     conn = get_connection()
     try:
@@ -468,7 +404,7 @@ def save_predictions_to_database(
             schema=PREDICTIONS_SCHEMA,
             table=PREDICTIONS_TABLE,
             df=prediction_records,
-            mode="append",
+            mode="replace",
             primary_key=None,
         )
         load_table(
@@ -476,7 +412,7 @@ def save_predictions_to_database(
             schema=PREDICTIONS_SCHEMA,
             table=SUMMARY_TABLE,
             df=summary_record,
-            mode="append",
+            mode="replace",
             primary_key=None,
         )
         if not priority_case_records.empty:
@@ -485,7 +421,7 @@ def save_predictions_to_database(
                 schema=PREDICTIONS_SCHEMA,
                 table=PRIORITY_CASES_TABLE,
                 df=priority_case_records,
-                mode="append",
+                mode="replace",
                 primary_key=None,
             )
     finally:
@@ -535,6 +471,29 @@ def resolve_threshold(metadata: Dict[str, Any], default_threshold: float = 0.5) 
     )
 
 
+def _infer_prediction_period(active_df: pd.DataFrame) -> tuple:
+    """
+    Return (year, month) of the latest date_sinistre_claim in active claims.
+    Ensures the fraud report always reflects the period of the scored claims,
+    not the calendar clock. Automatically shifts when new data is injected.
+    """
+    date_col = "date_sinistre_claim"
+    if date_col in active_df.columns:
+        dates = pd.to_datetime(active_df[date_col], errors="coerce").dropna()
+        if not dates.empty:
+            latest = dates.max()
+            year, month = int(latest.year), int(latest.month)
+            print(
+                f"[PERIOD] Prediction period auto-detected: "
+                f"{latest.strftime('%B %Y')}  "
+                f"(latest active claim: {latest.strftime('%Y-%m-%d')})"
+            )
+            return year, month
+    now = datetime.now()
+    print(f"[PERIOD] No date column — falling back to current month: {now.strftime('%B %Y')}")
+    return int(now.year), int(now.month)
+
+
 def main() -> None:
     print("\n" + "=" * 70)
     print("INSURANCE FRAUD DETECTION - PREDICTION & KPI GENERATION")
@@ -545,24 +504,41 @@ def main() -> None:
     threshold = resolve_threshold(metadata, default_threshold=0.5)
 
     claims = load_claims_data()
+
+    # Auto-detect prediction period from the data
+    pred_year, pred_month = _infer_prediction_period(claims)
+    month_label = datetime(year=pred_year, month=pred_month, day=1).strftime("%B %Y")
+
     predictions = predict_fraud(claims, model, threshold)
+
+    # ── Coherence assertion ──────────────────────────────────────
+    critical_count = int((predictions["risk_level"] == "Critical").sum())
+    predicted_fraud_count = int(predictions["predicted_fraud"].sum())
+    assert critical_count == predicted_fraud_count, (
+        f"INCOHERENCE: critical_count={critical_count} != predicted_fraud_count={predicted_fraud_count}"
+    )
 
     kpis = calculate_kpis(predictions, metadata, threshold)
     dashboard_payload = build_dashboard_payload(predictions, kpis)
 
     save_outputs(predictions, dashboard_payload)
-    save_predictions_to_database(predictions, kpis, metadata, threshold)
+    save_predictions_to_database(predictions, kpis, metadata, threshold, pred_month)
 
-    print("\n[EXECUTIVE KPI SNAPSHOT]")
-    print(f"  Total investigation hours: {kpis['total_investigation_hours']:.1f} hours")
-    print(f"  Expected preventable loss: {kpis['expected_preventable_loss']:.2f} TND")
-    print(f"  Expected review cost: {kpis['expected_review_cost']:.2f} TND")
-    print(f"  Expected net savings: {kpis['expected_net_savings']:.2f} TND")
-    print(f"  Expected ROI: {kpis['expected_roi']:.2f}x")
-    print(f"  High-risk claim rate: {kpis['high_risk_claim_rate']:.2%}")
-    print(f"  Average predictive risk score: {kpis['average_predictive_risk_score']:.4f}")
-    print(f"  Managerial intervention rate: {kpis['managerial_intervention_rate']:.2%}")
-    print(f"  Suspected fraud claim rate: {kpis['suspected_fraud_claim_rate']:.2%}")
+    # ── Summary print ────────────────────────────────────────────
+    risk_dist = kpis.get("risk_distribution", {})
+    scored = kpis["total_scored_claims"]
+    fraud_rate = predicted_fraud_count / scored * 100 if scored else 0
+    print(f"\n[RESULTS] Prediction period : {month_label}  (auto-detected from data)")
+    print(f"          Scored {scored} active claims  (threshold={threshold})")
+    print(f"  Risk distribution:  Critical={risk_dist.get('Critical',0)}  |  High={risk_dist.get('High',0)}  |  Medium={risk_dist.get('Medium',0)}  |  Low={risk_dist.get('Low',0)}")
+    print(f"  Predicted fraud (=Critical): {predicted_fraud_count}  ({fraud_rate:.2f}%)")
+    print(f"  Flagged for investigation:   {kpis['flagged_for_investigation']}")
+    print(f"  Investigation hours:         {kpis['total_investigation_hours']:.1f}h")
+    print(f"  Expected preventable loss:   {kpis['expected_preventable_loss']:,.0f} TND")
+    print(f"  Expected review cost:        {kpis['expected_review_cost']:,.0f} TND")
+    print(f"  Expected net savings:        {kpis['expected_net_savings']:,.0f} TND")
+    print(f"  Expected ROI:                {kpis['expected_roi']:.1f}x")
+    print(f"  [COHERENCE] critical_count={critical_count} == predicted_fraud={predicted_fraud_count}  OK")
 
     print("\n" + "=" * 70)
     print("FRAUD PREDICTION COMPLETED")

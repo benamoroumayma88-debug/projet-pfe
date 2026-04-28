@@ -1,0 +1,5 @@
+severity_bucket,claim_count,total_indemnisation_tnd,avg_indemnisation_tnd,pct_of_total_budget
+high,790,6.548806e+06,8289.63,39.7
+medium,1419,5.4928245e+06,3870.91,33.3
+very_high,228,3.7248522e+06,16337.07,22.6
+low,850,732406.56,861.65,4.4

@@ -1,0 +1,10 @@
+{
+  "fingerprints": {
+    "dbo.Clients": "112400:1106037085",
+    "dbo.Polices_Assurance": "141508:-1449399877",
+    "dbo.Vehicules": "139507:-901207464",
+    "dbo.Sinistres": "56202:1948538036",
+    "dbo.addon_sinistres": "50000:1902819560"
+  },
+  "last_run": "2026-04-28 12:54:15"
+}

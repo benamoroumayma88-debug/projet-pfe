@@ -43,64 +43,15 @@
         </div>
     </div>
 
-    <!-- ═══ Charts & Detailed KPIs ═══ -->
-    <div class="grid-2">
-        <div class="panel">
-            <div class="panel-header">&#x1F4CA; Risk Distribution (4-Level)</div>
-            <div class="panel-body">
-                <div class="chart-container">
-                    <canvas id="fraudDoughnut"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="panel">
-            <div class="panel-header">&#x1F50D; Investigation Metrics</div>
-            <div class="panel-body">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Investigation Load</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--accent);">@((s.InvestigationLoadRate * 100).ToString("F1"))%</div>
-                    </div>
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Avg Ticket (TND)</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--accent);">@s.AvgTicketSizeInQueueTnd.ToString("N0")</div>
-                    </div>
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Precision @@ Top 5%</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--success);">@((s.PrecisionAtTop5Pct * 100).ToString("F1"))%</div>
-                    </div>
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Precision @@ Top 10%</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--success);">@((s.PrecisionAtTop10Pct * 100).ToString("F1"))%</div>
-                    </div>
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Capture @@ Top 10%</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--warning);">@((s.CaptureRateTop10Pct * 100).ToString("F1"))%</div>
-                    </div>
-                    <div style="padding:.6rem;border-radius:var(--radius-sm);background:#f8fafc;">
-                        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;">Mgr. Intervention Rate</div>
-                        <div style="font-size:1.3rem;font-weight:800;color:var(--critical);">@((s.ManagerialInterventionRate * 100).ToString("F1"))%</div>
-                    </div>
-                </div>
-                <div style="margin-top:1rem;">
-                    <div style="font-size:.85rem;margin-bottom:.5rem;display:flex;justify-content:space-between;">
-                        <span><span class="badge-risk badge-critical">Critical</span> @s.CriticalRiskCount</span>
-                        <span><span class="badge-risk badge-high">High</span> @s.HighRiskCount</span>
-                        <span><span class="badge-risk badge-medium">Medium</span> @s.MediumRiskCount</span>
-                        <span><span class="badge-risk badge-low">Low</span> @s.LowRiskCount</span>
-                    </div>
-                    <div class="risk-bar" style="height:36px;">
-                        @{ double fTotal = s.CriticalRiskCount + s.HighRiskCount + s.MediumRiskCount + s.LowRiskCount; }
-                        @if (fTotal > 0)
-                        {
-                            <div class="segment seg-critical" style="flex:@s.CriticalRiskCount;">@s.CriticalRiskCount</div>
-                            <div class="segment seg-high" style="flex:@s.HighRiskCount;">@s.HighRiskCount</div>
-                            <div class="segment seg-medium" style="flex:@s.MediumRiskCount;">@s.MediumRiskCount</div>
-                            <div class="segment seg-low" style="flex:@s.LowRiskCount;">@s.LowRiskCount</div>
-                        }
-                    </div>
-                </div>
-            </div>
+    <!-- ═══ Power BI Dashboard ═══ -->
+    <div class="panel">
+        <div class="panel-header">&#x1F6A8; Fraud Detection Report</div>
+        <div class="panel-body p-0">
+            <iframe title="Power BI Fraud Report"
+                    src="https://app.powerbi.com/reportEmbed?reportId=25d729e1-ff85-4bd8-8b1e-cc976ad749bb&autoAuth=true&ctid=119689b1-4b51-43b0-9c27-34e6c9279d98&filterPaneEnabled=false&navContentPaneEnabled=false"
+                    style="width:100%;height:780px;border:none;display:block;"
+                    allowfullscreen="true">
+            </iframe>
         </div>
     </div>
 
@@ -366,33 +317,3 @@
     </div>
 }
 
-@section Scripts {
-    @if (Model.Summary != null)
-    {
-        var s = Model.Summary;
-        <script>
-            (function () {
-                new Chart(document.getElementById('fraudDoughnut').getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Critical', 'High', 'Medium', 'Low'],
-                        datasets: [{
-                            data: [@s.CriticalRiskCount, @s.HighRiskCount, @s.MediumRiskCount, @s.LowRiskCount],
-                            backgroundColor: ['#7c3aed', '#ef4444', '#f59e0b', '#10b981'],
-                            borderWidth: 0,
-                            hoverOffset: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '60%',
-                        plugins: {
-                            legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } }
-                        }
-                    }
-                });
-            })();
-        </script>
-    }
-}

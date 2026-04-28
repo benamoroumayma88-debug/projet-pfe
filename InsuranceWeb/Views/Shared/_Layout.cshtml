@@ -59,6 +59,17 @@
                                 </li>
                             }
 
+                            @* Business Analyst only: Reporting *@
+                            @if (userRole == "Business Analyst")
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Reporting" ? "active" : "")"
+                                       asp-controller="Reporting" asp-action="Index">
+                                        <span class="nav-icon">&#x1F4DD;</span> Reports
+                                    </a>
+                                </li>
+                            }
+
                             @* Manager only: Data Upload *@
                             @if (userRole == "Manager")
                             {

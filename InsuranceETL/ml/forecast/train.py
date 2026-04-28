@@ -114,6 +114,20 @@ def build_monthly_series(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
+    # ── IMPORTANT: exclude active/open claims from the training series.
+    # Active claims (Ouvert, En_cours, En_cours_d_expertise) represent the
+    # CURRENT open portfolio — their indemnisation is 0 or partial (not settled),
+    # and they are injected as forward-looking data, not historical completions.
+    # Including them distorts the time series with artificial volume spikes and
+    # indemnisation dips, which makes SARIMA extrapolate wildly.
+    ACTIVE_STATUSES_TRAIN = ["Ouvert", "En_cours", "En_cours_d_expertise"]
+    if "statut_sinistre_claim" in df.columns:
+        n_before = len(df)
+        df = df[~df["statut_sinistre_claim"].isin(ACTIVE_STATUSES_TRAIN)]
+        n_excluded = n_before - len(df)
+        print(f"[FILTER] Excluded {n_excluded:,} active/open claims — "
+              f"training on {len(df):,} closed/resolved claims only")
+
     # Parse date
     df["date_sinistre_claim"] = pd.to_datetime(df["date_sinistre_claim"], errors="coerce")
     df = df.dropna(subset=["date_sinistre_claim"])
@@ -147,13 +161,21 @@ def build_monthly_series(df: pd.DataFrame) -> pd.DataFrame:
     monthly.index = monthly.index.to_timestamp()
     monthly = monthly.sort_index()
 
+    # ── Drop the most recent calendar month if it is the current month
+    # (partial month → distorted per-month counts that SARIMA would treat as real).
+    today_first = pd.Timestamp(datetime.now().year, datetime.now().month, 1)
+    if len(monthly) > 0 and monthly.index[-1] >= today_first:
+        dropped = monthly.index[-1].strftime("%Y-%m")
+        monthly = monthly.iloc[:-1]
+        print(f"[FILTER] Dropped incomplete current month {dropped} from training series")
+
     # Reindex to fill any missing calendar months via linear interpolation
     full_range = pd.date_range(monthly.index.min(), monthly.index.max(), freq="MS")
     monthly = monthly.reindex(full_range).interpolate(method="linear")
 
     print(
         f"[AGGREGATE] {len(monthly)} months of history  "
-        f"({monthly.index[0].strftime('%Y-%m')} -> {monthly.index[-1].strftime('%Y-%m')})"
+        f"({monthly.index[0].strftime('%Y-%m')} → {monthly.index[-1].strftime('%Y-%m')})"
     )
     return monthly
 
@@ -166,8 +188,8 @@ def check_stationarity(series: pd.Series, name: str) -> bool:
         result = adfuller(series.dropna(), autolag="AIC")
         p_val = result[1]
         stationary = p_val < 0.05
-        label = "stationary (OK)" if stationary else "non-stationary (will diff)"
-        print(f"    ADF p={p_val:.4f}  -> {label}")
+        label = "stationary ✓" if stationary else "non-stationary (will diff)"
+        print(f"    ADF p={p_val:.4f}  → {label}")
         return stationary
     except Exception:
         return False
@@ -304,7 +326,7 @@ def train_all_models(monthly: pd.DataFrame) -> Dict:
                 "unit":        defn["unit"],
                 "description": defn["description"],
             }
-            print(f"    Saved -> {model_path}\n")
+            print(f"    Saved → {model_path}\n")
 
         except Exception as exc:
             print(f"    ERROR training {kpi}: {exc}\n")
@@ -336,7 +358,7 @@ def save_training_metadata(results: Dict, monthly: pd.DataFrame) -> None:
     os.makedirs(MODEL_DIR, exist_ok=True)
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, default=_convert)
-    print(f"[SAVE] Training manifest -> {meta_path}")
+    print(f"[SAVE] Training manifest → {meta_path}")
 
 
 # ─────────────────────────────────────────────────────────

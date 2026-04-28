@@ -10,6 +10,15 @@ namespace InsuranceWeb
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // ── WLAN Deployment: bind to both localhost and network interface ──
+            if (!builder.Environment.IsDevelopment())
+            {
+                builder.WebHost.UseUrls(
+                    "http://localhost:5000",    // local access
+                    "http://0.0.0.0:5001"      // WLAN access 
+                );
+            }
+
             // Add services to the container.
             builder.Services.AddControllersWithViews();
 
