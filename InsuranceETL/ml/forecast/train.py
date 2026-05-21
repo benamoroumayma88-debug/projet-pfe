@@ -30,6 +30,11 @@ import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -160,6 +165,17 @@ def build_monthly_series(df: pd.DataFrame) -> pd.DataFrame:
     monthly = pd.DataFrame(aggs)
     monthly.index = monthly.index.to_timestamp()
     monthly = monthly.sort_index()
+
+    # ── Cap training series at 2025-12 to exclude 2026 data.
+    # 2026 months are distorted: Jan/Feb have inflated counts from bulk uploads,
+    # Mar/Apr have tiny counts because most claims are still open/active.
+    # Training on this data causes SARIMA to extrapolate the spike pattern.
+    cap_date = pd.Timestamp("2025-12-01")
+    if len(monthly) > 0 and monthly.index[-1] > cap_date:
+        n_before = len(monthly)
+        monthly = monthly[monthly.index <= cap_date]
+        print(f"[FILTER] Capped training series at 2025-12 "
+              f"(excluded {n_before - len(monthly)} distorted 2026 months from SARIMA training)")
 
     # ── Drop the most recent calendar month if it is the current month
     # (partial month → distorted per-month counts that SARIMA would treat as real).

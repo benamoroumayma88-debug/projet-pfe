@@ -17,13 +17,13 @@
 {
     var s = Model.Summary;
     <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-value text-primary">@s.TotalActiveClaims.ToString("N0")</div>
-            <div class="kpi-label">Active Claims</div>
-        </div>
         <div class="kpi-card kpi-danger">
             <div class="kpi-value text-danger">@s.TotalPredictedCost.ToString("N0")</div>
-            <div class="kpi-label">Total Predicted Cost (TND)</div>
+            <div class="kpi-label">Total Indemnisation (TND)</div>
+        </div>
+        <div class="kpi-card kpi-critical">
+            <div class="kpi-value text-critical">@Model.TotalBudgetTnd.ToString("N0")</div>
+            <div class="kpi-label">Total Budget (TND)</div>
         </div>
         <div class="kpi-card kpi-warning">
             <div class="kpi-value text-warning">@s.AverageCostPerClaim.ToString("N0")</div>

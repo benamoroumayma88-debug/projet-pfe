@@ -34,6 +34,7 @@ namespace InsuranceWeb.Data
             modelBuilder.Entity<ClaimFraudPrediction>().ToTable("claim_fraud_predictions", "ml");
             modelBuilder.Entity<ClaimFraudSummary>().ToTable("claim_fraud_summary", "ml");
             modelBuilder.Entity<ClaimFraudPriorityCase>().ToTable("claim_fraud_priority_cases", "ml");
+            modelBuilder.Entity<ClaimFraudPriorityCase>().HasKey(x => new { x.PredictionRunId, x.PriorityRank });
             modelBuilder.Entity<ClaimForecastMonthly>().ToTable("claim_forecast_monthly", "ml");
             modelBuilder.Entity<ClaimForecastSummary>().ToTable("claim_forecast_summary", "ml");
             modelBuilder.Entity<ClaimForecastAlert>().ToTable("claim_forecast_alerts", "ml");

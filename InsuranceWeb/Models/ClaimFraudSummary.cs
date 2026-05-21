@@ -6,10 +6,10 @@ namespace InsuranceWeb.Models
     [Table("claim_fraud_summary", Schema = "ml")]
     public class ClaimFraudSummary
     {
-        [Key]
-        [Column("summary_record_id")]
+        [NotMapped]
         public string SummaryRecordId { get; set; } = string.Empty;
 
+        [Key]
         [Column("prediction_run_id")]
         public string? PredictionRunId { get; set; }
 
@@ -19,7 +19,7 @@ namespace InsuranceWeb.Models
         [Column("model_name")]
         public string? ModelName { get; set; }
 
-        [Column("currency")]
+        [NotMapped]
         public string? Currency { get; set; }
 
         [Column("threshold_used")]
@@ -31,16 +31,16 @@ namespace InsuranceWeb.Models
         [Column("flagged_for_investigation")]
         public long FlaggedForInvestigation { get; set; }
 
-        [Column("investigation_load_rate")]
+        [NotMapped]
         public double InvestigationLoadRate { get; set; }
 
         [Column("total_investigation_hours")]
         public double TotalInvestigationHours { get; set; }
 
-        [Column("expected_fraud_cases_total")]
+        [NotMapped]
         public double ExpectedFraudCasesTotal { get; set; }
 
-        [Column("expected_true_fraud_in_queue")]
+        [NotMapped]
         public double ExpectedTrueFraudInQueue { get; set; }
 
         [Column("expected_fraud_exposure_total_tnd")]
@@ -58,28 +58,28 @@ namespace InsuranceWeb.Models
         [Column("expected_roi")]
         public double ExpectedRoi { get; set; }
 
-        [Column("precision_at_top_5pct")]
+        [NotMapped]
         public double PrecisionAtTop5Pct { get; set; }
 
-        [Column("precision_at_top_10pct")]
+        [NotMapped]
         public double PrecisionAtTop10Pct { get; set; }
 
-        [Column("capture_rate_top_10pct")]
+        [NotMapped]
         public double CaptureRateTop10Pct { get; set; }
 
-        [Column("avg_ticket_size_in_queue_tnd")]
+        [NotMapped]
         public double AvgTicketSizeInQueueTnd { get; set; }
 
-        [Column("high_risk_claim_rate")]
+        [NotMapped]
         public double HighRiskClaimRate { get; set; }
 
-        [Column("average_predictive_risk_score")]
+        [NotMapped]
         public double AveragePredictiveRiskScore { get; set; }
 
-        [Column("managerial_intervention_rate")]
+        [NotMapped]
         public double ManagerialInterventionRate { get; set; }
 
-        [Column("suspected_fraud_claim_rate")]
+        [NotMapped]
         public double SuspectedFraudClaimRate { get; set; }
 
         [Column("low_risk_count")]

@@ -6,8 +6,7 @@ namespace InsuranceWeb.Models
     [Table("claim_fraud_priority_cases", Schema = "ml")]
     public class ClaimFraudPriorityCase
     {
-        [Key]
-        [Column("priority_case_record_id")]
+        [NotMapped]
         public string PriorityCaseRecordId { get; set; } = string.Empty;
 
         [Column("prediction_run_id")]
@@ -16,13 +15,13 @@ namespace InsuranceWeb.Models
         [Column("scored_at")]
         public DateTime? ScoredAt { get; set; }
 
-        [Column("model_name")]
+        [NotMapped]
         public string? ModelName { get; set; }
 
-        [Column("decision_threshold")]
+        [NotMapped]
         public double? DecisionThreshold { get; set; }
 
-        [Column("priority_list_type")]
+        [NotMapped]
         public string? PriorityListType { get; set; }
 
         [Column("priority_rank")]

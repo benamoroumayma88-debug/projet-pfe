@@ -201,7 +201,7 @@ def build_dim_time(policies: pd.DataFrame, claims: pd.DataFrame) -> pd.DataFrame
 def build_fact_claim(clean_claims, clean_policies, clean_clients, clean_vehicles) -> pd.DataFrame:
     fact = clean_claims.copy()
 
-    # Policy merge
+    # Polices merge
     pol_cols = [
         "contract_id", "client_id",
         "type_couverture", "prime_assurance_annuelle",

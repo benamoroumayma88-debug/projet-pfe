@@ -249,8 +249,6 @@ def build_dashboard_payload(predictions: pd.DataFrame, kpis: Dict[str, Any]) -> 
 def build_prediction_records(
     predictions: pd.DataFrame,
     kpis: Dict[str, Any],
-    metadata: Dict[str, Any],
-    threshold: float,
     run_id: str,
     scored_at: datetime,
     prediction_month: int,
@@ -387,13 +385,12 @@ def save_predictions_to_database(
     predictions: pd.DataFrame,
     kpis: Dict[str, Any],
     metadata: Dict[str, Any],
-    threshold: float,
     pred_month: int,
 ) -> None:
     run_id = datetime.now().strftime("FRD-%Y%m%d-%H%M%S")
     scored_at = datetime.now()
 
-    prediction_records = build_prediction_records(predictions, kpis, metadata, threshold, run_id, scored_at, pred_month)
+    prediction_records = build_prediction_records(predictions, kpis, run_id, scored_at, pred_month)
     summary_record = build_summary_record(kpis, metadata, run_id, scored_at, pred_month)
     priority_case_records = build_priority_case_records(predictions, run_id, scored_at)
 
@@ -435,19 +432,6 @@ def save_predictions_to_database(
         f"[run_id={run_id}]"
     )
 
-
-def save_outputs(predictions: pd.DataFrame, dashboard_payload: Dict[str, Any]) -> None:
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    dashboard_path = os.path.join(OUTPUT_DIR, "dashboard_insights.json")
-    with open(dashboard_path, "w", encoding="utf-8") as f:
-        json.dump(dashboard_payload, f, indent=2, default=str)
-
-    predictions_path = os.path.join(OUTPUT_DIR, "predictions.csv")
-    predictions.to_csv(predictions_path, index=False, encoding="utf-8")
-
-    print(f"[SAVE] Dashboard insights: {dashboard_path}")
-    print(f"[SAVE] Scored predictions: {predictions_path}")
 
 
 def resolve_threshold(metadata: Dict[str, Any], default_threshold: float = 0.5) -> float:
@@ -519,10 +503,7 @@ def main() -> None:
     )
 
     kpis = calculate_kpis(predictions, metadata, threshold)
-    dashboard_payload = build_dashboard_payload(predictions, kpis)
-
-    save_outputs(predictions, dashboard_payload)
-    save_predictions_to_database(predictions, kpis, metadata, threshold, pred_month)
+    save_predictions_to_database(predictions, kpis, metadata, pred_month)
 
     # ── Summary print ────────────────────────────────────────────
     risk_dist = kpis.get("risk_distribution", {})

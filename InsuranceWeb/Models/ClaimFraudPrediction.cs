@@ -16,13 +16,13 @@ namespace InsuranceWeb.Models
         [Column("scored_at")]
         public DateTime? ScoredAt { get; set; }
 
-        [Column("model_name")]
+        [NotMapped]
         public string? ModelName { get; set; }
 
-        [Column("decision_threshold")]
+        [NotMapped]
         public double? DecisionThreshold { get; set; }
 
-        [Column("currency")]
+        [NotMapped]
         public string? Currency { get; set; }
 
         [Column("claim_id")]
@@ -61,14 +61,15 @@ namespace InsuranceWeb.Models
         [Column("predicted_fraud")]
         public long PredictedFraud { get; set; }
 
-        [Column("suspected_fraud_flag")]
+        [NotMapped]
         public long SuspectedFraudFlag { get; set; }
 
-        [Column("high_risk_flag")]
+        [NotMapped]
         public long HighRiskFlag { get; set; }
 
-        [Column("managerial_intervention_required")]
-        public long ManagerialInterventionRequired { get; set; }
+        [NotMapped]
+        public long ManagerialInterventionRequired =>
+            (RiskLevel == "Critical" || RiskLevel == "High") ? 1 : 0;
 
         [Column("estimated_investigation_hours")]
         public double? EstimatedInvestigationHours { get; set; }

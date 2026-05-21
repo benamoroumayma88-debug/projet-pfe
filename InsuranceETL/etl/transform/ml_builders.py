@@ -96,7 +96,7 @@ def build_ml_claim_dataset(clean_clients, clean_policies, clean_vehicles, clean_
         base["statut_sinistre_claim"] = "Unknown"
 
     # -------------------------
-    # Merge policy features
+    # Merge polices features
     # -------------------------
     policy_feats = [
         "contract_id",

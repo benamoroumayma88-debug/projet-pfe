@@ -26,7 +26,7 @@ def _q(name: str) -> str:
     return f"[{name}]"
 
 
-# ---------- Schema / table existence ----------
+# Schema / table existence ----------
 def _ensure_schema(conn: pyodbc.Connection, schema: str) -> None:
     schema = _safe_ident(schema)
     sql = """
@@ -72,7 +72,7 @@ def _drop_table(conn: pyodbc.Connection, schema: str, table: str) -> None:
     conn.commit()
 
 
-# ---------- SQL type mapping ----------
+# SQL type mapping ----------
 def _sql_type_for_series(s: pd.Series) -> str:
     """
     Simple robust mapping.

@@ -49,13 +49,13 @@ namespace InsuranceWeb.Controllers
             if (!string.IsNullOrEmpty(runId))
             {
                 topRisk = await _db.ClaimFraudPriorityCases
-                    .Where(x => x.PredictionRunId == runId && x.PriorityListType == "TOP_20_RISK")
+                    .Where(x => x.PredictionRunId == runId)
                     .OrderBy(x => x.PriorityRank)
                     .AsNoTracking()
                     .ToListAsync();
 
                 critical = await _db.ClaimFraudPriorityCases
-                    .Where(x => x.PredictionRunId == runId && x.PriorityListType == "CRITICAL_TO_MONITOR")
+                    .Where(x => x.PredictionRunId == runId && x.RiskLevel == "Critical")
                     .OrderBy(x => x.PriorityRank)
                     .AsNoTracking()
                     .ToListAsync();

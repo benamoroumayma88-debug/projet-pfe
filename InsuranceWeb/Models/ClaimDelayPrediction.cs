@@ -37,10 +37,10 @@ namespace InsuranceWeb.Models
         [Column("type_sinistre_claim")]
         public string? TypeSinistreClaim { get; set; }
 
-        [Column("claim_severity_bucket")]
+        [NotMapped]
         public string? ClaimSeverityBucket { get; set; }
 
-        [Column("montant_estime_dommage_claim")]
+        [NotMapped]
         public double? MontantEstimeDommageClaim { get; set; }
 
         [Column("montant_indemnisation_claim")]
@@ -65,16 +65,16 @@ namespace InsuranceWeb.Models
             set => PredictedDelayedInt = value ? 1 : 0; 
         }
 
-        [Column("predicted_delay_days")]
-        public double? PredictedDelayDays { get; set; }
+        [Column("predicted_excess_days")]
+        public long? PredictedDelayDays { get; set; }
 
-        [Column("estimated_cost_impact_claim")]
+        [Column("delay_cost_at_risk_tnd")]
         public double? EstimatedCostImpactClaim { get; set; }
 
         [Column("decision_threshold")]
         public double? DecisionThreshold { get; set; }
 
-        [Column("model_mode")]
+        [Column("model_name")]
         public string? ModelMode { get; set; }
 
         [Column("prediction_month")]

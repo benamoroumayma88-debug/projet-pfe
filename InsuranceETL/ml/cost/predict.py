@@ -242,21 +242,6 @@ def calculate_kpis(preds: pd.DataFrame, breakdowns: dict) -> dict:
     }
 
 
-# ── CSV save ───────────────────────────────────────────────────────────────────
-def save_predictions(preds: pd.DataFrame, breakdowns: dict) -> None:
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    preds_path = os.path.join(OUTPUT_DIR, "predictions.csv")
-    preds.to_csv(preds_path, index=False)
-    print(f"[SAVE] Per-claim predictions  → {preds_path}")
-
-    for key, df_bd in breakdowns.items():
-        if not df_bd.empty:
-            path = os.path.join(OUTPUT_DIR, f"breakdown_{key}.csv")
-            df_bd.to_csv(path, index=False)
-            print(f"[SAVE] Breakdown ({key}) → {path}")
-
-
 # ── SQL persistence ────────────────────────────────────────────────────────────
 def build_prediction_records(
     predictions_df: pd.DataFrame,
@@ -455,7 +440,6 @@ def main():
     breakdowns = compute_breakdowns(preds)
     kpis       = calculate_kpis(preds, breakdowns)
 
-    save_predictions(preds, breakdowns)
     save_predictions_to_database(preds, kpis, prediction_month)
     print_cost_report(preds, breakdowns, kpis, prediction_month)
     print("[DONE] COST PREDICTION PIPELINE COMPLETED")

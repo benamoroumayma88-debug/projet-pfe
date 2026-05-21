@@ -33,6 +33,11 @@ import os
 import sys
 import time
 import traceback
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 from datetime import datetime
 
 # Ensure project root is on path
@@ -190,9 +195,20 @@ def run_ml_predictions():
             results[name] = "✅ Success"
             print(f"[ML] {name} predictions complete ✅")
         except FileNotFoundError as e:
-            # Model not trained yet — skip gracefully
-            results[name] = f"⚠️ Skipped (model not trained: {e})"
-            print(f"[ML] {name} skipped — {e}")
+            # Model not trained yet — try to train it first
+            print(f"[ML] {name} model not found — attempting to train...")
+            train_path = module_path.replace(".predict", ".train")
+            try:
+                train_module = __import__(train_path, fromlist=["main"])
+                train_module.main()
+                print(f"[ML] {name} training complete — running predictions...")
+                module = __import__(module_path, fromlist=["main"])
+                module.main()
+                results[name] = "✅ Trained + predicted"
+                print(f"[ML] {name} predictions complete ✅")
+            except Exception as train_err:
+                results[name] = f"⚠️ Skipped (training failed: {train_err})"
+                print(f"[ML] {name} training failed: {train_err}")
         except Exception as e:
             results[name] = f"❌ Failed: {e}"
             print(f"[ML] {name} FAILED: {e}")

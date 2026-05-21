@@ -11,6 +11,10 @@ import json
 import os
 import sys
 import importlib
+
+# Ensure Unicode box-drawing characters print correctly on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 from datetime import datetime
 from typing import Dict, Tuple, Any, List
 
@@ -453,6 +457,15 @@ def save_artifacts(
     print("═" * W)
 
     best_name = max(results.keys(), key=lambda name: results[name]["selection_score"])
+
+    # ── Save models FIRST (before any Unicode printing that might fail) ──
+    best_model     = models[best_name]
+    best_model_path = os.path.join(MODEL_DIR, "fraud_detection_model.pkl")
+    joblib.dump(best_model, best_model_path)
+
+    for model_name, pipeline in models.items():
+        joblib.dump(pipeline, os.path.join(MODEL_DIR, f"fraud_{model_name}_model.pkl"))
+
     if len(results) >= 2:
         other_name = [k for k in results if k != best_name][0]
         auc_diff   = results[best_name]["auc"] - results[other_name]["auc"]
@@ -463,14 +476,7 @@ def save_artifacts(
         )
     else:
         print(f"  ► WINNER : {LABELS.get(best_name, best_name)}")
-    print("═" * W + "\n")
-
-    best_model     = models[best_name]
-    best_model_path = os.path.join(MODEL_DIR, "fraud_detection_model.pkl")
-    joblib.dump(best_model, best_model_path)
-
-    for model_name, pipeline in models.items():
-        joblib.dump(pipeline, os.path.join(MODEL_DIR, f"fraud_{model_name}_model.pkl"))
+    print("=" * W + "\n")
 
     feature_importance = get_feature_importance(best_model)
 

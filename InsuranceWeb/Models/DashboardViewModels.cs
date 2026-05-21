@@ -20,6 +20,9 @@ namespace InsuranceWeb.Models
         public int HighCostCount { get; set; }
         public int MediumCostCount { get; set; }
         public int LowCostCount { get; set; }
+
+        // Budget = Indemnisation + Delay penalties + Fraud exposure + Staffing
+        public double TotalBudgetTnd { get; set; }
     }
 
     // ─── Fraud ─────────────────────────────────────

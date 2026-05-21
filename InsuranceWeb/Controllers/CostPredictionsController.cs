@@ -67,6 +67,18 @@ namespace InsuranceWeb.Controllers
                 lowCount = await runQuery.CountAsync(x => x.CostRiskLevel == "Low");
             }
 
+            // Budget = Indemnisation + Delay penalties + Staffing cost + Fraud investigation cost
+            // Note: fraud exposure is already a subset of indemnisation (not additive)
+            double totalBudget = summary?.TotalPredictedCost ?? 0;
+            var latestDelay = await _db.ClaimDelayRunSummaries
+                .OrderByDescending(x => x.ScoredAt).AsNoTracking().FirstOrDefaultAsync();
+            var latestFraud = await _db.ClaimFraudSummaries
+                .OrderByDescending(x => x.ScoredAt).AsNoTracking().FirstOrDefaultAsync();
+            if (latestDelay != null)
+                totalBudget += latestDelay.EstimatedCostImpactTnd + latestDelay.StaffingCostTnd;
+            if (latestFraud != null)
+                totalBudget += latestFraud.ExpectedReviewCostTnd;
+
             var vm = new CostDashboardViewModel
             {
                 Summary = summary,
@@ -78,6 +90,7 @@ namespace InsuranceWeb.Controllers
                 SelectedRunId = runId,
                 SelectedRiskLevel = riskLevel,
                 SearchClaimId = claimId,
+                TotalBudgetTnd = totalBudget,
                 AvailableRunIds = runList,
                 HighCostCount = highCount,
                 MediumCostCount = medCount,

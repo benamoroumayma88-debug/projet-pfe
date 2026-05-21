@@ -86,7 +86,7 @@ else
                 var f = Model.FraudSummary!;
                 <div class="mini-kpi"><span>Claims Scored</span><strong>@f.TotalScoredClaims.ToString("N0")</strong></div>
                 <div class="mini-kpi"><span>Flagged for Investigation</span><strong style="color:var(--danger);">@f.FlaggedForInvestigation</strong></div>
-                <div class="mini-kpi"><span>Investigation Load</span><strong>@((f.InvestigationLoadRate * 100).ToString("F1"))%</strong></div>
+                <div class="mini-kpi"><span>Investigation Hours</span><strong>@f.TotalInvestigationHours.ToString("N0")h</strong></div>
                 <div class="mini-kpi"><span>Fraud Exposure (TND)</span><strong style="color:var(--critical);">@f.ExpectedFraudExposureTotalTnd.ToString("N0")</strong></div>
                 <div class="mini-kpi"><span>Net Savings (TND)</span><strong style="color:var(--success);">@f.ExpectedNetSavingsTnd.ToString("N0")</strong></div>
                 <div class="mini-kpi"><span>ROI</span><strong>@((f.ExpectedRoi * 100).ToString("F0"))%</strong></div>

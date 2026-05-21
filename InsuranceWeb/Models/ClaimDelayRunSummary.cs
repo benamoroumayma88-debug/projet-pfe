@@ -37,23 +37,26 @@ namespace InsuranceWeb.Models
         [Column("low_risk_count")]
         public long LowRiskCount { get; set; }
 
-        [Column("estimated_delayed_claims")]
-        public double EstimatedDelayedClaims { get; set; }
+        [NotMapped]
+        public long EstimatedDelayedClaims { get; set; }
 
-        [Column("estimated_total_delay_days")]
+        [Column("total_excess_days")]
         public long EstimatedTotalDelayDays { get; set; }
 
-        [Column("avg_delay_days_per_claim")]
+        [Column("avg_excess_days_per_delayed")]
         public double AvgDelayDaysPerClaim { get; set; }
 
-        [Column("estimated_cost_impact_tnd")]
+        [Column("estimated_delay_penalty_tnd")]
         public double EstimatedCostImpactTnd { get; set; }
 
-        [Column("avg_cost_per_delayed_claim")]
+        [NotMapped]
         public double AvgCostPerDelayedClaim { get; set; }
 
-        [Column("recommended_staff")]
+        [Column("recommended_agents")]
         public long RecommendedStaff { get; set; }
+
+        [Column("staffing_cost_tnd")]
+        public double StaffingCostTnd { get; set; }
 
         [Column("projection_month")]
         public long? ProjectionMonth { get; set; }

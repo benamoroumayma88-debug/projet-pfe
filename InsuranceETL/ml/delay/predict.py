@@ -29,14 +29,14 @@ import joblib
 import numpy as np
 import pandas as pd
 
-# Add project root to path for imports
+#path for imports
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, project_root)
 from etl.extract import extract_table
 from etl.db_connection import get_connection
 from etl.load import load_table
 
-# ─── Configuration ────────────────────────────────────────────────────────────
+#Configuration
 MODEL_PATH          = "ml/delay/models/delay_prediction_model.pkl"
 MODEL_METADATA_PATH = "ml/delay/models/model_metadata.pkl"
 DURATION_MODEL_PATH = "ml/delay/models/duration_model.pkl"
@@ -49,7 +49,7 @@ SUMMARY_TABLE       = "claim_delay_run_summary"
 ACTIVE_STATUSES = ["Ouvert", "En_cours", "En_cours_d_expertise"]
 
 
-# ─── Period inference (data-driven) ───────────────────────────────────────
+#Period inference (data-driven) 
 def _infer_prediction_period(active_df: pd.DataFrame) -> tuple:
     """
     Return (year, month) of the latest date_sinistre_claim in active claims.
@@ -79,7 +79,7 @@ PRIORITY_CAPACITY_FACTOR    = 0.5       # high-risk claims take 2x time -> half 
 AGENT_MONTHLY_SALARY        = 3_000.0   # TND
 
 
-# ─── Model loading ────────────────────────────────────────────────────────────
+#Model loading
 def load_model():
     """Load the best delay model and its metadata."""
     if not os.path.exists(MODEL_PATH):
@@ -105,7 +105,7 @@ def load_duration_model():
     return None
 
 
-# ─── Data loading ─────────────────────────────────────────────────────────────
+#Data loading
 def load_claims():
     """Load only ACTIVE claims for prediction."""
     print("[LOAD] Loading claims from ml.ml_claim ...")
@@ -124,7 +124,7 @@ def load_claims():
     return df
 
 
-# ─── Feature preparation ─────────────────────────────────────────────────────
+#Feature preparation
 DROP_COLS = [
     "claim_id", "client_id", "contract_id", "vehicle_id",
     "date_sinistre_claim", "est_frauduleux_claim", "claim_severity_bucket",
@@ -136,7 +136,7 @@ def _prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=[c for c in DROP_COLS if c in df.columns], errors="ignore")
 
 
-# ─── Prediction engine ───────────────────────────────────────────────────────
+#Prediction engine
 def predict_delays(model, duration_model, df, threshold):
     """
     Score every active claim and add four coherent prediction columns:
@@ -152,18 +152,9 @@ def predict_delays(model, duration_model, df, threshold):
     out = df.copy()
     out["delay_probability"] = proba
 
-    # ── Binary decision (the SINGLE source of truth) ──────────
+    #Binary decision 
     out["predicted_delayed"] = (proba >= threshold).astype(int)
 
-    # ── Risk level derived FROM the threshold ─────────────────
-    #   High     = prob >= threshold                  (WILL be delayed)
-    #   Medium   = prob >= threshold * 0.6 AND < threshold  (borderline — watch zone)
-    #   Low      = prob <  threshold * 0.6            (likely on time)
-    #
-    # Guarantee:
-    #   • Every High  → predicted_delayed = 1
-    #   • Every Medium → predicted_delayed = 0
-    #   • Every Low    → predicted_delayed = 0
     mid_boundary = threshold * 0.6
     conditions = [
         proba >= threshold,
@@ -172,7 +163,7 @@ def predict_delays(model, duration_model, df, threshold):
     choices = ["High", "Medium"]
     out["risk_level"] = np.select(conditions, choices, default="Low")
 
-    # ── Estimated excess days beyond SLA ──────────────────────
+    # Estimated excess days beyond SLA
     if duration_model is not None:
         out["predicted_excess_days"] = 0
         mask = out["predicted_delayed"] == 1
@@ -200,7 +191,7 @@ def predict_delays(model, duration_model, df, threshold):
     print(f"  risk_level : {out['risk_level'].value_counts().to_dict()}")
     return out
 
-# ─── Build SQL payloads ──────────────────────────────────────────────────────
+#Build SQL payloads
 
 def _find_amount_col(df):
     for c in ["montant_indemnisation_claim", "montant_estime_dommage_claim"]:
@@ -354,7 +345,7 @@ def build_run_summary(run_id, scored_at, predictions_df, threshold, metadata):
     return pd.DataFrame([row])
 
 
-# ─── SQL persistence ─────────────────────────────────────────────────────────
+#SQL persistence 
 def save_to_database(predictions_df, threshold, metadata, pred_month: int):
     """Persist predictions + summary to SQL Server (replace mode — one run at a time)."""
     rec_df, run_id, scored_at = build_prediction_records(predictions_df, threshold, metadata)
@@ -376,7 +367,7 @@ def save_to_database(predictions_df, threshold, metadata, pred_month: int):
     return run_id, scored_at, summary_df
 
 
-# ─── Dashboard JSON ──────────────────────────────────────────────────────────
+#Dashboard JSON 
 def save_dashboard_json(predictions_df, summary_df):
     """Save dashboard insights JSON for Power BI or frontend consumption."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -470,7 +461,7 @@ def print_report(summary_df, prediction_year: int = 0, prediction_month: int = 0
     print("  Coherence check passed: all numbers consistent\n")
 
 
-# ─── Main ─────────────────────────────────────────────────────────────────────
+#Main 
 def main():
     """Main prediction pipeline."""
     print("=" * 65)
