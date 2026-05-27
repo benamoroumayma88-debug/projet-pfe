@@ -51,7 +51,6 @@ namespace InsuranceWeb.Controllers
                 "Montant_Estime_Dommage_Claim", "Montant_Indemnisation_Claim",
                 "Est_Frauduleux_Claim", "Statut_Sinistre_Claim",
                 "Incoherence_Dommages", "Nature_Sinistre_Consistante",
-                "Date_Debut_Contrat", "Date_Fin_Contrat", "Type_Couverture",
                 "Date_Cloture_Claim", "Duree_Traitement_Jours",
                 "Duree_Traitement_Heures", "SLA_Jours", "Is_Delayed"
             },

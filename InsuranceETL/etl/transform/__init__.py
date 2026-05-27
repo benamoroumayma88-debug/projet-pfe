@@ -39,9 +39,9 @@ def transform_all(
     dim_time = build_dim_time(clean_policies, clean_claims)
 
     if not clean_claims.empty:
-        fact_claim = build_fact_claim(clean_claims, clean_policies, clean_clients, clean_vehicles)
+        fact_claim = build_fact_claim(clean_claims)
         ml_claim = build_ml_claim_dataset(
-            clean_clients, clean_policies, clean_vehicles, clean_claims
+            dim_client, dim_policy, dim_vehicle, fact_claim
         )
     else:
         fact_claim = pd.DataFrame()

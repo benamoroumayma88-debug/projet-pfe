@@ -295,14 +295,13 @@ def load_table(
 
 def load_all(conn: pyodbc.Connection, out: dict, mode: str = "replace") -> None:
     """
-    out is your transform_all output: out["clean_clients"], etc.
+    Persist transform_all output to the database.
+
+    The data warehouse (dw.*) is the single clean data store — there is no
+    separate stg.* layer. Cleaned dataframes live in memory only during the
+    transform; they are persisted as the dim/fact DW tables.
     """
     mapping = [
-        ("stg", "clean_clients", out.get("clean_clients"), "client_id"),
-        ("stg", "clean_policies", out.get("clean_policies"), "contract_id"),
-        ("stg", "clean_vehicles", out.get("clean_vehicles"), "vehicle_id"),
-        ("stg", "clean_claims", out.get("clean_claims"), "claim_id"),
-    
         ("dw", "dim_client", out.get("dim_client"), "client_id"),
         ("dw", "dim_policy", out.get("dim_policy"), "contract_id"),
         ("dw", "dim_vehicle", out.get("dim_vehicle"), "vehicle_id"),

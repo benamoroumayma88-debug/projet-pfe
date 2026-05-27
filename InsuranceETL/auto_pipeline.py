@@ -34,6 +34,8 @@ import sys
 import time
 import traceback
 
+import pandas as pd
+
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'reconfigure'):
@@ -60,6 +62,45 @@ MONITORED_TABLES = [
     "dbo.Sinistres",
     "dbo.addon_sinistres",
 ]
+
+
+# ──────────────────────────────────────────────
+#  Incremental ETL helpers
+# ──────────────────────────────────────────────
+
+def _table_exists(conn, schema: str, table: str) -> bool:
+    """Check if a table exists in the given schema."""
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM sys.tables t
+            JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE s.name = ? AND t.name = ?
+            """,
+            (schema, table),
+        )
+        return cur.fetchone() is not None
+    finally:
+        cur.close()
+
+
+def _get_existing_ids(conn, schema: str, table: str, id_col: str) -> set:
+    """Return the set of existing IDs from a table. Empty set if table missing."""
+    if not _table_exists(conn, schema, table):
+        return set()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT [{id_col}] FROM [{schema}].[{table}]")
+        return {row[0] for row in cur.fetchall() if row[0] is not None}
+    finally:
+        cur.close()
+
+
+def _normalize_id_set(ids) -> set:
+    """Normalize an iterable of IDs to uppercase trimmed strings for set comparison."""
+    return {str(x).strip().upper() for x in ids if x is not None}
 
 
 # ──────────────────────────────────────────────
@@ -158,9 +199,8 @@ def run_etl():
     out = transform_all(clients, policies, vehicles, claims)
 
     print(f"[ETL] Transform complete: "
-          f"stg={len(out['clean_clients'])}+{len(out['clean_policies'])}+"
-          f"{len(out['clean_vehicles'])}+{len(out['clean_claims'])} rows, "
-          f"dw.fact_claim={len(out['fact_claim'])} rows, "
+          f"dw.dim_client={len(out['dim_client'])}, dw.dim_policy={len(out['dim_policy'])}, "
+          f"dw.dim_vehicle={len(out['dim_vehicle'])}, dw.fact_claim={len(out['fact_claim'])}, "
           f"ml.ml_claim={len(out['ml_claim'])} rows")
 
     print("[ETL] Loading into database...")
@@ -168,6 +208,129 @@ def run_etl():
     try:
         load_all(conn, out, mode="replace")
         print("[ETL] Load complete ✅")
+    finally:
+        conn.close()
+
+
+def run_etl_incremental():
+    """
+    Run incremental ETL: only process new claims (not yet in dw.fact_claim
+    or ml.ml_claim), then append the deltas to the DW and ML tables.
+
+    Falls back to full ETL automatically if dw.fact_claim doesn't exist yet
+    (first run / fresh install).
+
+    Trade-offs vs --force mode:
+      • Updates to existing client/policy/vehicle rows are NOT propagated.
+      • Re-uploads of identical claims are silently skipped.
+      • A periodic --force run is recommended for self-healing.
+    """
+    print("\n" + "=" * 60)
+    print("  ETL PIPELINE (INCREMENTAL)")
+    print("=" * 60)
+
+    # Safety net: fresh DB or missing DW → fall back to full ETL
+    conn = get_connection()
+    try:
+        if not _table_exists(conn, "dw", "fact_claim"):
+            print("[INCREMENTAL] dw.fact_claim not found — falling back to full ETL.")
+            conn.close()
+            run_etl()
+            return
+
+        # Build the set of already-known claim_ids (union of DW and ML)
+        existing_claim_ids = (
+            _get_existing_ids(conn, "dw", "fact_claim", "claim_id")
+            | _get_existing_ids(conn, "ml", "ml_claim", "claim_id")
+        )
+        existing_client_ids = _get_existing_ids(conn, "dw", "dim_client", "client_id")
+        existing_contract_ids = _get_existing_ids(conn, "dw", "dim_policy", "contract_id")
+        existing_vehicle_ids = _get_existing_ids(conn, "dw", "dim_vehicle", "vehicle_id")
+        existing_date_keys = _get_existing_ids(conn, "dw", "dim_time", "date_key")
+    finally:
+        conn.close()
+
+    print(
+        f"[INCREMENTAL] DW state: {len(existing_claim_ids)} claims, "
+        f"{len(existing_client_ids)} clients, "
+        f"{len(existing_contract_ids)} policies, "
+        f"{len(existing_vehicle_ids)} vehicles"
+    )
+
+    # Extract all raw data (small tables; the cost is in transform/load)
+    print("[ETL] Extracting raw data from dbo tables...")
+    clients = extract_table("dbo.Clients")
+    policies = extract_table("dbo.Polices_Assurance")
+    vehicles = extract_table("dbo.Vehicules")
+    claims = extract_table("dbo.Sinistres")
+
+    # Locate the raw claim_id column case-insensitively
+    claim_id_col = next((c for c in claims.columns if c.lower() == "claim_id"), None)
+    if claim_id_col is None:
+        print("[INCREMENTAL] dbo.Sinistres has no Claim_ID column — falling back to full ETL.")
+        run_etl()
+        return
+
+    # Find the set of NEW claim_ids
+    raw_claim_ids = _normalize_id_set(claims[claim_id_col].dropna())
+    existing_claim_ids_norm = _normalize_id_set(existing_claim_ids)
+    new_claim_ids = raw_claim_ids - existing_claim_ids_norm
+
+    if not new_claim_ids:
+        print("[INCREMENTAL] No new claims found. Nothing to load.")
+        return
+
+    print(f"[INCREMENTAL] Found {len(new_claim_ids)} new claim(s) to process")
+
+    # Filter raw claims to only the new ones
+    mask_new = claims[claim_id_col].apply(
+        lambda x: str(x).strip().upper() if pd.notna(x) else None
+    ).isin(new_claim_ids)
+    new_claims = claims[mask_new].copy()
+
+    # Transform: full clients/policies/vehicles (cleaning needs full context for
+    # outlier handling), filtered to only the new claims.
+    print(f"[ETL] Transforming {len(new_claims)} new claim(s) + full reference data...")
+    out = transform_all(clients, policies, vehicles, new_claims)
+
+    # Filter dim outputs to exclude entities already in the DW (avoid PK violations).
+    # fact_claim and ml_claim are already filtered (they're built from new_claims only).
+    existing_client_ids_norm = _normalize_id_set(existing_client_ids)
+    existing_contract_ids_norm = _normalize_id_set(existing_contract_ids)
+    existing_vehicle_ids_norm = _normalize_id_set(existing_vehicle_ids)
+
+    def _drop_existing(df, id_col, existing_norm):
+        if df.empty or id_col not in df.columns:
+            return df
+        mask = df[id_col].apply(
+            lambda x: str(x).strip().upper() if pd.notna(x) else None
+        ).isin(existing_norm)
+        return df[~mask].copy()
+
+    out["dim_client"] = _drop_existing(out["dim_client"], "client_id", existing_client_ids_norm)
+    out["dim_policy"] = _drop_existing(out["dim_policy"], "contract_id", existing_contract_ids_norm)
+    out["dim_vehicle"] = _drop_existing(out["dim_vehicle"], "vehicle_id", existing_vehicle_ids_norm)
+
+    if not out["dim_time"].empty and "date_key" in out["dim_time"].columns:
+        out["dim_time"] = out["dim_time"][
+            ~out["dim_time"]["date_key"].isin(existing_date_keys)
+        ].copy()
+
+    print(
+        f"[INCREMENTAL] Deltas to append: "
+        f"dim_client={len(out['dim_client'])}, "
+        f"dim_policy={len(out['dim_policy'])}, "
+        f"dim_vehicle={len(out['dim_vehicle'])}, "
+        f"dim_time={len(out['dim_time'])}, "
+        f"fact_claim={len(out['fact_claim'])}, "
+        f"ml_claim={len(out['ml_claim'])}"
+    )
+
+    print("[ETL] Appending new rows to database...")
+    conn = get_connection()
+    try:
+        load_all(conn, out, mode="append")
+        print("[ETL] Incremental load complete ✅")
     finally:
         conn.close()
 
@@ -256,6 +419,50 @@ def run_full_pipeline(reason: str = "manual trigger"):
     print("=" * 60 + "\n")
 
 
+def run_full_pipeline_incremental(reason: str = "incremental trigger"):
+    """
+    Run the pipeline in incremental mode:
+      • ETL: only process new claims (append to dw.* and ml.ml_claim)
+      • ML : still scores ALL active claims (cannot be incremental — active
+             status changes over time and every run must re-evaluate the
+             full active portfolio)
+    """
+    run_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("\n" + "=" * 60)
+    print(f"  AUTO PIPELINE (INCREMENTAL) — {run_time}")
+    print(f"  Reason: {reason}")
+    print("=" * 60)
+
+    start = time.time()
+
+    # 1. Incremental ETL (auto-falls-back to full if DW doesn't exist)
+    run_etl_incremental()
+
+    # 2. ML predictions still run on full data — see docstring above
+    ml_results = run_ml_predictions()
+
+    # 3. Save fingerprint state so change detection stays consistent
+    conn = get_connection()
+    try:
+        fingerprints = get_current_fingerprints(conn)
+    finally:
+        conn.close()
+    save_state(fingerprints, run_time)
+
+    elapsed = time.time() - start
+
+    print("\n" + "=" * 60)
+    print("  PIPELINE COMPLETE (INCREMENTAL)")
+    print("=" * 60)
+    print(f"  Duration: {elapsed:.1f}s")
+    print(f"  ML Results:")
+    for name, status in ml_results.items():
+        print(f"    {name}: {status}")
+    print(f"  State saved to: {STATE_FILE}")
+    print(f"  Dashboards are now up to date.")
+    print("=" * 60 + "\n")
+
+
 # ──────────────────────────────────────────────
 #  Entry points
 # ──────────────────────────────────────────────
@@ -308,12 +515,19 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--force", action="store_true",
-        help="Force run the pipeline regardless of changes"
+        help="Force run the FULL pipeline regardless of changes (truncates and rebuilds dw.* + ml.ml_claim)"
+    )
+    parser.add_argument(
+        "--incremental", action="store_true",
+        help="Run in incremental mode: only process new claims (appends to dw.* + ml.ml_claim). "
+             "Fast path used by the web upload. Falls back to full ETL if dw.fact_claim doesn't exist."
     )
 
     args = parser.parse_args()
 
-    if args.force:
+    if args.incremental:
+        run_full_pipeline_incremental(reason="Incremental run (--incremental flag)")
+    elif args.force:
         run_full_pipeline(reason="Forced by --force flag")
     elif args.watch:
         watch_mode(interval=args.interval)
