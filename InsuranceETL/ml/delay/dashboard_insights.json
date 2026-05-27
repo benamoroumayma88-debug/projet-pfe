@@ -1,0 +1,134 @@
+{
+  "run_timestamp": "2026-05-27 22:23:23.900069",
+  "model_name": "xgboost",
+  "decision_threshold": 0.6800000000000004,
+  "currency": "TND",
+  "summary": {
+    "total_active_claims": 1964,
+    "predicted_delayed_count": 194,
+    "predicted_on_time_count": 1770,
+    "predicted_delay_rate_pct": 9.9,
+    "high_risk_count": 194,
+    "medium_risk_count": 1253,
+    "low_risk_count": 517,
+    "total_excess_days": 424,
+    "avg_excess_days_per_delayed": 2.2,
+    "total_amount_at_risk_tnd": 269578.97,
+    "cost_at_risk_tnd": 201869.25,
+    "estimated_delay_penalty_tnd": 232800.0,
+    "recommended_agents": 27,
+    "staffing_cost_tnd": 81000.0
+  },
+  "risk_distribution": {
+    "Medium": 1253,
+    "Low": 517,
+    "High": 194
+  },
+  "top_high_risk_claims": [
+    {
+      "claim_id": "NCLM-87483CAE",
+      "delay_probability": 0.8709689974784851,
+      "predicted_excess_days": 9,
+      "type_sinistre_claim": "Catastrophe Naturelle",
+      "sla_jours": 20.0
+    },
+    {
+      "claim_id": "CLM-96AAB76E",
+      "delay_probability": 0.8540916442871094,
+      "predicted_excess_days": 7,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "NCLM-BD241319",
+      "delay_probability": 0.8496826887130737,
+      "predicted_excess_days": 8,
+      "type_sinistre_claim": "Vol",
+      "sla_jours": 20.0
+    },
+    {
+      "claim_id": "CLM-DD5EAE68",
+      "delay_probability": 0.8272836208343506,
+      "predicted_excess_days": 6,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "NCLM-C103F456",
+      "delay_probability": 0.8181476593017578,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Catastrophe Naturelle",
+      "sla_jours": 14.0
+    },
+    {
+      "claim_id": "NCLM-B6DC7DD4",
+      "delay_probability": 0.8153236508369446,
+      "predicted_excess_days": 3,
+      "type_sinistre_claim": "Catastrophe Naturelle",
+      "sla_jours": 7.0
+    },
+    {
+      "claim_id": "CLM-F15BA8E0",
+      "delay_probability": 0.8120580911636353,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "CLM-45082DD0",
+      "delay_probability": 0.8093066811561584,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "CLM-D4C9B375",
+      "delay_probability": 0.8089683055877686,
+      "predicted_excess_days": 6,
+      "type_sinistre_claim": "Vol",
+      "sla_jours": 20.0
+    },
+    {
+      "claim_id": "CLM-A164DB66",
+      "delay_probability": 0.8085663318634033,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "NCLM-A7B8634A",
+      "delay_probability": 0.803917646408081,
+      "predicted_excess_days": 3,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 7.0
+    },
+    {
+      "claim_id": "CLM-FDC9195B",
+      "delay_probability": 0.8031408190727234,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "CLM-99A14627",
+      "delay_probability": 0.8031269311904907,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "CLM-F9610509",
+      "delay_probability": 0.8023991584777832,
+      "predicted_excess_days": 5,
+      "type_sinistre_claim": "Bris De Glace",
+      "sla_jours": 15.0
+    },
+    {
+      "claim_id": "NCLM-0A5C43FD",
+      "delay_probability": 0.8001535534858704,
+      "predicted_excess_days": 3,
+      "type_sinistre_claim": "Incendie",
+      "sla_jours": 7.0
+    }
+  ]
+}

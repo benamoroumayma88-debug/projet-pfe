@@ -1,0 +1,179 @@
+@model InsuranceWeb.Models.ForecastDashboardViewModel
+@{
+    ViewData["Title"] = "Forecast Alerts & Insights";
+    var s = Model.Summary;
+    var criticalCount = Model.Alerts.Count(a => a.AlertLevel?.ToUpper() == "CRITICAL");
+    var highCount = Model.Alerts.Count(a => a.AlertLevel?.ToUpper() == "HIGH");
+    var mediumCount = Model.Alerts.Count(a => a.AlertLevel?.ToUpper() == "MEDIUM");
+}
+
+<div class="page-header">
+    <h1>&#x1F6A8; Forecast Alerts &amp; Insights</h1>
+    <p class="subtitle">Critical alerts, risk warnings and strategic recommendations for the forecast period</p>
+    <a asp-action="Index" asp-route-runId="@Model.SelectedRunId" class="btn-back-link">
+        &larr; Back to Forecast Dashboard
+    </a>
+</div>
+
+@if (s == null)
+{
+    <div class="panel">
+        <div class="panel-body" style="text-align:center;padding:3rem;">
+            <p style="font-size:1.1rem;color:var(--text-muted);">No forecast data available.</p>
+        </div>
+    </div>
+}
+else
+{
+    <!-- ═══ Alert Summary KPIs ═══ -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit,minmax(160px,1fr));">
+        <div class="kpi-card kpi-critical">
+            <div class="kpi-value text-critical">@criticalCount</div>
+            <div class="kpi-label">Critical Alerts</div>
+        </div>
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-value text-danger">@highCount</div>
+            <div class="kpi-label">High Alerts</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-value text-warning">@mediumCount</div>
+            <div class="kpi-label">Medium Alerts</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value text-primary">@Model.Alerts.Count</div>
+            <div class="kpi-label">Total Alerts</div>
+        </div>
+    </div>
+
+    <!-- ═══ Filter Tabs ═══ -->
+    <div class="alerts-filter-bar">
+        <button class="alerts-filter-btn active" data-filter="all">All (@Model.Alerts.Count)</button>
+        @if (criticalCount > 0)
+        {
+            <button class="alerts-filter-btn filter-critical" data-filter="CRITICAL">Critical (@criticalCount)</button>
+        }
+        @if (highCount > 0)
+        {
+            <button class="alerts-filter-btn filter-high" data-filter="HIGH">High (@highCount)</button>
+        }
+        @if (mediumCount > 0)
+        {
+            <button class="alerts-filter-btn filter-medium" data-filter="MEDIUM">Medium (@mediumCount)</button>
+        }
+    </div>
+
+    <!-- ═══ Alerts List ═══ -->
+    @if (Model.Alerts.Any())
+    {
+        <div class="alerts-list" id="alertsList">
+            @foreach (var a in Model.Alerts)
+            {
+                var alertClass = a.AlertLevel?.ToUpper() switch { "CRITICAL" => "alert-critical", "HIGH" => "alert-high", _ => "alert-medium" };
+                var iconEmoji = a.AlertLevel?.ToUpper() switch { "CRITICAL" => "&#x1F6D1;", "HIGH" => "&#x1F525;", _ => "&#x26A0;&#xFE0F;" };
+                var badgeBg = a.AlertLevel?.ToUpper() switch { "CRITICAL" => "#7c3aed", "HIGH" => "#ef4444", _ => "#f59e0b" };
+                <div class="alert-card-full @alertClass" data-level="@a.AlertLevel?.ToUpper()">
+                    <div class="alert-card-header">
+                        <span class="alert-icon">@Html.Raw(iconEmoji)</span>
+                        <span class="alert-badge" style="background:@badgeBg;">@a.AlertLevel</span>
+                        <span class="alert-period">@a.Period</span>
+                        <span class="alert-type-tag">@(a.AlertType?.Replace("_", " "))</span>
+                    </div>
+                    <div class="alert-card-message">@a.AlertMessage</div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="panel">
+            <div class="panel-body" style="text-align:center;padding:3rem;">
+                <span style="font-size:3rem;">&#x2705;</span>
+                <p style="font-size:1.1rem;color:var(--text-muted);margin-top:1rem;">No alerts for this forecast run. Everything looks good!</p>
+            </div>
+        </div>
+    }
+
+    <!-- ═══ Strategic Insight ═══ -->
+    @if (!string.IsNullOrEmpty(s.StrategicInsight))
+    {
+        <div class="insight-panel">
+            <div class="insight-header">
+                <span class="insight-icon">&#x1F9E0;</span>
+                <h3>Strategic Insight</h3>
+            </div>
+            <div class="insight-body">
+                <p>@s.StrategicInsight</p>
+            </div>
+        </div>
+    }
+
+    <!-- ═══ Risk Context ═══ -->
+    <div class="grid-2" style="margin-top:1.5rem;">
+        <div class="panel">
+            <div class="panel-header">&#x1F3AF; Risk Context</div>
+            <div class="panel-body">
+                <div style="display:grid;gap:.75rem;">
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">High Risk Months</span>
+                        <span class="insight-stat-value" style="color:var(--danger);">@(s.HighRiskMonths ?? "None")</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Surge Expected</span>
+                        <span class="insight-stat-value" style="color:var(--warning);">@(s.SurgeExpectedMonths ?? "None")</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Peak Delay</span>
+                        <span class="insight-stat-value">@s.PeakDelayMonth — @s.PeakDelayRatePct.ToString("F1")%</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Peak Cost</span>
+                        <span class="insight-stat-value">@s.PeakCostMonth — @s.PeakCostTnd.ToString("N0") TND</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">&#x1F4B0; Savings Opportunity</div>
+            <div class="panel-body">
+                <div style="display:grid;gap:.75rem;">
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Total Savings Potential</span>
+                        <span class="insight-stat-value" style="color:var(--success);font-weight:700;">@s.TotalNetSavingsPotentialTnd.ToString("N0") TND</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Total Expected Cost</span>
+                        <span class="insight-stat-value">@s.TotalExpectedCostTnd.ToString("N0") TND</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Avg Agents/Month</span>
+                        <span class="insight-stat-value">@s.AvgAgentsNeededPerMonth.ToString("F0")</span>
+                    </div>
+                    <div class="insight-stat-row">
+                        <span class="insight-stat-label">Forecast Period</span>
+                        <span class="insight-stat-value">@s.TotalForecastPeriod</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+    document.querySelectorAll('.alerts-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.alerts-filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            const filter = this.dataset.filter;
+            document.querySelectorAll('.alert-card-full').forEach(card => {
+                if (filter === 'all' || card.dataset.level === filter) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+</script>
+}

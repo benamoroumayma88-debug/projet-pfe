@@ -1,0 +1,331 @@
+@{
+    ViewData["Title"] = "Data Upload";
+    var tables = ViewBag.Tables as List<string> ?? new List<string>();
+    var expectedColumns = ViewBag.ExpectedColumns as string[];
+    var pipelineTriggered = ViewBag.PipelineTriggered as bool? ?? false;
+    var pipelineAlreadyRunning = ViewBag.PipelineAlreadyRunning as bool? ?? false;
+    var showPipelineMonitor = pipelineTriggered || pipelineAlreadyRunning;
+}
+
+<div class="page-wrapper">
+    <div class="page-header">
+        <h1>&#x1F4C1; Data Upload</h1>
+        <p class="subtitle">Upload CSV files to load data into the database tables</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ViewBag.Success as string))
+    {
+        <div class="alert-banner alert-success-banner">
+            <span>&#x2705;</span> @ViewBag.Success
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(ViewBag.Error as string))
+    {
+        <div class="alert-banner alert-error-banner">
+            <span>&#x26A0;&#xFE0F;</span> @ViewBag.Error
+        </div>
+        @if (expectedColumns != null)
+        {
+            <div class="panel" style="margin-bottom: 1.25rem;">
+                <div class="panel-header">Expected Columns</div>
+                <div class="panel-body">
+                    <code style="font-size: .82rem; word-break: break-all;">@string.Join(", ", expectedColumns)</code>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── Pipeline Status Monitor ── *@
+    <div class="panel" id="pipelinePanel" style="margin-bottom: 1.25rem; display: @(showPipelineMonitor ? "block" : "none");">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="pipelineTitle">&#x2699;&#xFE0F; Pipeline Status</span>
+            <span id="pipelineBadge" class="pipeline-badge pipeline-badge-running">Checking...</span>
+        </div>
+        <div class="panel-body">
+            <div id="pipelineInfo" style="margin-bottom: .75rem;">
+                <span style="font-size: .85rem; color: var(--text-secondary);">
+                    The ETL &amp; ML pipeline processes your new data through staging, data warehouse, and prediction models.
+                </span>
+            </div>
+            <div id="pipelineProgress" style="margin-bottom: .75rem;">
+                <div style="background: var(--bg-secondary, #e9ecef); border-radius: 4px; overflow: hidden; height: 6px;">
+                    <div id="pipelineProgressBar" style="width: 0%; height: 100%; background: var(--accent, #4f46e5); transition: width 0.5s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: .35rem; font-size: .78rem; color: var(--text-secondary);">
+                    <span id="pipelineTimer">Elapsed: 0s</span>
+                    <span id="pipelineStage">Initializing...</span>
+                </div>
+            </div>
+            <details id="pipelineLogDetails" style="margin-top: .5rem;">
+                <summary style="cursor: pointer; font-size: .82rem; font-weight: 600;">View Pipeline Log</summary>
+                <pre id="pipelineLog" style="max-height: 300px; overflow-y: auto; background: #1e1e2e; color: #cdd6f4; padding: .75rem; border-radius: 6px; font-size: .75rem; margin-top: .5rem; white-space: pre-wrap; word-break: break-word;"></pre>
+            </details>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <!-- Upload Form -->
+        <div class="panel">
+            <div class="panel-header">&#x1F4E4; Upload CSV File</div>
+            <div class="panel-body">
+                <form method="post" asp-action="Upload" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+
+                    <div class="form-group-upload">
+                        <label for="targetTable">Target Table</label>
+                        <select name="targetTable" id="targetTable" class="form-control-upload" required>
+                            <option value="">-- Select a table --</option>
+                            @foreach (var table in tables)
+                            {
+                                <option value="@table">@table</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-group-upload" style="margin-top: 1rem;">
+                        <label for="csvFile">CSV File</label>
+                        <div class="file-drop-zone" id="dropZone">
+                            <input type="file" name="csvFile" id="csvFile" accept=".csv" required
+                                   style="display:none;" />
+                            <div class="drop-content">
+                                <span style="font-size: 2.5rem;">&#x1F4C4;</span>
+                                <p><strong>Drag & drop your CSV file here</strong></p>
+                                <p class="text-muted-sm">or <a href="#" id="browseLink">browse</a> to select a file</p>
+                                <p class="file-name-display" id="fileName"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-upload" style="margin-top: 1.25rem;">
+                        &#x1F680; Upload & Import
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Info -->
+        <div class="panel">
+            <div class="panel-header">&#x1F4CB; Table Schema</div>
+            <div class="panel-body">
+                <p class="text-muted-sm" id="schemaPlaceholder">Select a table to view its expected columns.</p>
+                <div id="schemaInfo" style="display:none;">
+                    <p style="font-size: .85rem; margin-bottom: .75rem;">
+                        Your CSV must include these column headers for <strong id="schemaTableName"></strong>:
+                    </p>
+                    <div class="column-list" id="columnList"></div>
+                </div>
+            </div>
+
+            <div class="panel-header" style="border-top: 1px solid var(--border);">&#x2139;&#xFE0F; Upload Guidelines</div>
+            <div class="panel-body">
+                <ul class="guidelines-list">
+                    <li>File must be <strong>.csv</strong> format (comma or semicolon separated)</li>
+                    <li>First row must contain column headers</li>
+                    <li>Column names must match the table schema exactly</li>
+                    <li>Maximum file size: <strong>50 MB</strong></li>
+                    <li>Empty values will be stored as NULL</li>
+                    <li>All rows are inserted in a single transaction</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<style>
+    .pipeline-badge {
+        display: inline-block;
+        padding: .2rem .65rem;
+        border-radius: 12px;
+        font-size: .75rem;
+        font-weight: 600;
+        letter-spacing: .02em;
+    }
+    .pipeline-badge-running { background: #dbeafe; color: #1d4ed8; }
+    .pipeline-badge-completed { background: #dcfce7; color: #166534; }
+    .pipeline-badge-failed { background: #fee2e2; color: #991b1b; }
+    .pipeline-badge-idle { background: #f3f4f6; color: #6b7280; }
+
+    @@keyframes pulse-progress {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .6; }
+    }
+    #pipelineProgressBar.pulsing {
+        animation: pulse-progress 1.5s ease-in-out infinite;
+    }
+</style>
+<script>
+    // ── Drag and drop ──
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('csvFile');
+    const fileName = document.getElementById('fileName');
+    const browseLink = document.getElementById('browseLink');
+
+    browseLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files;
+            showFileName(e.dataTransfer.files[0].name);
+        }
+    });
+
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files.length > 0) {
+            showFileName(fileInput.files[0].name);
+        }
+    });
+
+    function showFileName(name) {
+        fileName.textContent = name;
+        fileName.style.display = 'block';
+        dropZone.classList.add('has-file');
+    }
+
+    // ── Schema display ──
+    const tableSelect = document.getElementById('targetTable');
+    tableSelect.addEventListener('change', function() {
+        const table = this.value;
+        if (!table) {
+            document.getElementById('schemaPlaceholder').style.display = '';
+            document.getElementById('schemaInfo').style.display = 'none';
+            return;
+        }
+        fetch('@Url.Action("GetTableColumns", "DataUpload")?table=' + encodeURIComponent(table))
+            .then(r => r.json())
+            .then(cols => {
+                document.getElementById('schemaPlaceholder').style.display = 'none';
+                document.getElementById('schemaInfo').style.display = '';
+                document.getElementById('schemaTableName').textContent = table;
+                const list = document.getElementById('columnList');
+                list.innerHTML = cols.map(c => '<span class="column-tag">' + c + '</span>').join('');
+            });
+    });
+
+    // ── Pipeline Status Monitor ──
+    var pipelinePolling = @(showPipelineMonitor ? "true" : "false");
+    var pollTimer = null;
+
+    function detectStage(output) {
+        if (!output) return 'Initializing...';
+        var lower = output.toLowerCase();
+        if (lower.includes('[ml] forecast predictions complete') || lower.includes('pipeline complete'))
+            return 'Pipeline complete';
+        if (lower.includes('[ml] running forecast'))
+            return 'ML: Forecast predictions...';
+        if (lower.includes('[ml] running fraud'))
+            return 'ML: Fraud predictions...';
+        if (lower.includes('[ml] running cost'))
+            return 'ML: Cost predictions...';
+        if (lower.includes('[ml] running delay'))
+            return 'ML: Delay predictions...';
+        if (lower.includes('ml predictions'))
+            return 'Running ML predictions...';
+        if (lower.includes('[etl] loading'))
+            return 'ETL: Loading to database...';
+        if (lower.includes('[etl] transform'))
+            return 'ETL: Transforming data...';
+        if (lower.includes('[etl] extract'))
+            return 'ETL: Extracting raw data...';
+        if (lower.includes('etl pipeline'))
+            return 'Starting ETL pipeline...';
+        return 'Processing...';
+    }
+
+    function estimateProgress(output, status) {
+        if (status === 'completed') return 100;
+        if (status === 'failed') return 100;
+        if (!output) return 5;
+        var lower = output.toLowerCase();
+        if (lower.includes('pipeline complete')) return 100;
+        if (lower.includes('[ml] forecast predictions complete')) return 95;
+        if (lower.includes('[ml] running forecast')) return 85;
+        if (lower.includes('[ml] running fraud')) return 70;
+        if (lower.includes('[ml] running cost')) return 55;
+        if (lower.includes('[ml] running delay')) return 40;
+        if (lower.includes('ml predictions')) return 35;
+        if (lower.includes('[etl] load complete')) return 30;
+        if (lower.includes('[etl] loading')) return 25;
+        if (lower.includes('[etl] transform complete')) return 20;
+        if (lower.includes('[etl] transform')) return 15;
+        if (lower.includes('[etl] extract')) return 10;
+        return 8;
+    }
+
+    function updatePipelineUI(data) {
+        var panel = document.getElementById('pipelinePanel');
+        var badge = document.getElementById('pipelineBadge');
+        var bar = document.getElementById('pipelineProgressBar');
+        var timer = document.getElementById('pipelineTimer');
+        var stage = document.getElementById('pipelineStage');
+        var log = document.getElementById('pipelineLog');
+
+        panel.style.display = 'block';
+
+        var progress = estimateProgress(data.output, data.status);
+        bar.style.width = progress + '%';
+
+        if (data.status === 'running') {
+            badge.textContent = 'Running';
+            badge.className = 'pipeline-badge pipeline-badge-running';
+            bar.classList.add('pulsing');
+            bar.style.background = 'var(--accent, #4f46e5)';
+        } else if (data.status === 'completed') {
+            badge.textContent = 'Completed';
+            badge.className = 'pipeline-badge pipeline-badge-completed';
+            bar.classList.remove('pulsing');
+            bar.style.background = '#22c55e';
+        } else if (data.status === 'failed') {
+            badge.textContent = 'Failed';
+            badge.className = 'pipeline-badge pipeline-badge-failed';
+            bar.classList.remove('pulsing');
+            bar.style.background = '#ef4444';
+        } else {
+            badge.textContent = 'Idle';
+            badge.className = 'pipeline-badge pipeline-badge-idle';
+            bar.classList.remove('pulsing');
+        }
+
+        timer.textContent = 'Elapsed: ' + (data.durationSeconds || 0) + 's';
+        stage.textContent = detectStage(data.output);
+        log.textContent = data.output || '(waiting for output...)';
+        log.scrollTop = log.scrollHeight;
+
+        // Stop polling when done
+        if (data.status === 'completed' || data.status === 'failed') {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+    }
+
+    function pollPipelineStatus() {
+        fetch('@Url.Action("PipelineStatus", "DataUpload")')
+            .then(r => r.json())
+            .then(data => updatePipelineUI(data))
+            .catch(() => {}); // silently ignore network errors
+    }
+
+    if (pipelinePolling) {
+        pollPipelineStatus();
+        pollTimer = setInterval(pollPipelineStatus, 2000);
+    }
+</script>
+}

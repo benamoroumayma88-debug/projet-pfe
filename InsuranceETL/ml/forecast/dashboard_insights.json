@@ -1,0 +1,520 @@
+{
+  "run_timestamp": "2026-05-27T22:23:46.449033",
+  "model_trained_at": "2026-03-23T17:52:37.007359",
+  "data_source": "ml.ml_claim",
+  "training_history_months": 98,
+  "forecast_horizon_months": 6,
+  "currency": "TND (Tunisian Dinar)",
+  "summary": {
+    "horizon_months": 6,
+    "total_forecast_period": "2026-05 \u2192 2026-10",
+    "total_expected_claims": 600,
+    "total_expected_cost_tnd": 480000.0,
+    "avg_monthly_delay_rate_pct": 35.0,
+    "avg_monthly_fraud_rate_pct": 10.0,
+    "total_expected_delays": 210,
+    "total_fraud_exposure_tnd": 48000.0,
+    "total_net_savings_potential_tnd": 108600.0,
+    "avg_agents_needed_per_month": 19.0,
+    "peak_volume_month": "May 2026",
+    "peak_volume_claims": 100,
+    "peak_delay_month": "May 2026",
+    "peak_delay_rate_pct": 35.0,
+    "peak_cost_month": "May 2026",
+    "peak_cost_tnd": 80000.0,
+    "high_risk_months": [
+      "May 2026",
+      "June 2026",
+      "July 2026",
+      "August 2026",
+      "September 2026",
+      "October 2026"
+    ],
+    "surge_expected_months": [],
+    "total_alerts": 12,
+    "critical_alerts": 0,
+    "high_alerts": 12,
+    "strategic_insight": "High-risk periods: May 2026, June 2026, July 2026, August 2026, September 2026, October 2026. Escalate monitoring and resource allocation.  Sustained delay rate of 35% requires structural process optimisation across the horizon.  Elevated fraud index (10.0%) warrants enhanced investigation protocols.  Proactive interventions could prevent up to 108K TND in losses over 6 months \u2013 ROI positive."
+  },
+  "monthly_details": [
+    {
+      "month": "May 2026",
+      "period": "2026-05",
+      "year": 2026,
+      "month_number": 5,
+      "seasonal_context": "May public holidays: Traffic spike risk",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in May 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in May 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    },
+    {
+      "month": "June 2026",
+      "period": "2026-06",
+      "year": 2026,
+      "month_number": 6,
+      "seasonal_context": "Summer begins: Student drivers, vacation travel \u2192 surge",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in June 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in June 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    },
+    {
+      "month": "July 2026",
+      "period": "2026-07",
+      "year": 2026,
+      "month_number": 7,
+      "seasonal_context": "Peak summer: Maximum vehicle usage \u2013 highest risk month",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in July 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in July 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    },
+    {
+      "month": "August 2026",
+      "period": "2026-08",
+      "year": 2026,
+      "month_number": 8,
+      "seasonal_context": "Vacation peak: Cross-country travel \u2192 high claim risk",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in August 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in August 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    },
+    {
+      "month": "September 2026",
+      "period": "2026-09",
+      "year": 2026,
+      "month_number": 9,
+      "seasonal_context": "Back-to-school: New young drivers, accident risk elevated",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in September 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in September 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    },
+    {
+      "month": "October 2026",
+      "period": "2026-10",
+      "year": 2026,
+      "month_number": 10,
+      "seasonal_context": "Autumn rains begin: Road condition deterioration",
+      "forecast": {
+        "claim_volume": 100.0,
+        "total_indemnisation_tnd": 80000.0,
+        "delay_rate_pct": 35.0,
+        "fraud_rate_pct": 10.0,
+        "avg_claim_amount_tnd": 800.0
+      },
+      "business_kpis": {
+        "expected_delayed_claims": 35.0,
+        "expected_fraud_cases": 10.0,
+        "expected_fraud_exposure_tnd": 8000.0,
+        "recommended_agents": 19,
+        "staffing_cost_tnd": 57000.0,
+        "total_delay_cost_tnd": 42000.0,
+        "preventable_delay_cost_tnd": 16800.0,
+        "net_fraud_savings_tnd": 1300.0,
+        "net_savings_potential_tnd": 18100.0,
+        "intervention_roi_pct": 251.4,
+        "budget_variance_pct": 0.0,
+        "workload_index": 0.066
+      },
+      "risk_level": "CRITICAL",
+      "volume_surge_pct": 0.0,
+      "is_surge_month": false,
+      "alerts": [
+        {
+          "level": "HIGH",
+          "type": "DELAY_RISK",
+          "message": "High delay rate forecast: 35% in October 2026. Intensify SLA monitoring and assign senior handlers to flagged cases."
+        },
+        {
+          "level": "HIGH",
+          "type": "FRAUD_RISK",
+          "message": "Elevated fraud rate forecast: 10.0% (10 cases) in October 2026. Deploy 2 fraud investigator(s)."
+        }
+      ],
+      "recommendations": [
+        "Early intervention this month could prevent up to 18K TND in losses.",
+        "Pre-assign 35 high-risk claims to fast-track handlers.",
+        "Flag 10 suspected fraud dossiers for proactive investigation."
+      ]
+    }
+  ],
+  "flat_table": [
+    {
+      "period": "2026-05",
+      "month": "May 2026",
+      "year": 2026,
+      "month_number": 5,
+      "seasonal_context": "May public holidays: Traffic spike risk",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in May 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in May 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    },
+    {
+      "period": "2026-06",
+      "month": "June 2026",
+      "year": 2026,
+      "month_number": 6,
+      "seasonal_context": "Summer begins: Student drivers, vacation travel \u2192 surge",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in June 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in June 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    },
+    {
+      "period": "2026-07",
+      "month": "July 2026",
+      "year": 2026,
+      "month_number": 7,
+      "seasonal_context": "Peak summer: Maximum vehicle usage \u2013 highest risk month",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in July 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in July 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    },
+    {
+      "period": "2026-08",
+      "month": "August 2026",
+      "year": 2026,
+      "month_number": 8,
+      "seasonal_context": "Vacation peak: Cross-country travel \u2192 high claim risk",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in August 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in August 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    },
+    {
+      "period": "2026-09",
+      "month": "September 2026",
+      "year": 2026,
+      "month_number": 9,
+      "seasonal_context": "Back-to-school: New young drivers, accident risk elevated",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in September 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in September 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    },
+    {
+      "period": "2026-10",
+      "month": "October 2026",
+      "year": 2026,
+      "month_number": 10,
+      "seasonal_context": "Autumn rains begin: Road condition deterioration",
+      "risk_level": "CRITICAL",
+      "is_surge_month": false,
+      "volume_surge_pct": 0.0,
+      "alert_count": 2,
+      "alert_messages": "High delay rate forecast: 35% in October 2026. Intensify SLA monitoring and assign senior handlers to flagged cases. | Elevated fraud rate forecast: 10.0% (10 cases) in October 2026. Deploy 2 fraud investigator(s).",
+      "recommendations": "Early intervention this month could prevent up to 18K TND in losses. | Pre-assign 35 high-risk claims to fast-track handlers. | Flag 10 suspected fraud dossiers for proactive investigation.",
+      "forecast_claim_volume": 100.0,
+      "forecast_total_indemnisation_tnd": 80000.0,
+      "forecast_delay_rate_pct": 35.0,
+      "forecast_fraud_rate_pct": 10.0,
+      "forecast_avg_claim_amount_tnd": 800.0,
+      "kpi_expected_delayed_claims": 35.0,
+      "kpi_expected_fraud_cases": 10.0,
+      "kpi_expected_fraud_exposure_tnd": 8000.0,
+      "kpi_recommended_agents": 19,
+      "kpi_staffing_cost_tnd": 57000.0,
+      "kpi_total_delay_cost_tnd": 42000.0,
+      "kpi_preventable_delay_cost_tnd": 16800.0,
+      "kpi_net_fraud_savings_tnd": 1300.0,
+      "kpi_net_savings_potential_tnd": 18100.0,
+      "kpi_intervention_roi_pct": 251.4,
+      "kpi_budget_variance_pct": 0.0,
+      "kpi_workload_index": 0.066
+    }
+  ],
+  "model_performance": {},
+  "business_assumptions": {
+    "agent_monthly_salary_tnd": 3000.0,
+    "agent_monthly_capacity_claims": 80,
+    "delay_cost_per_claim_tnd": 1200.0,
+    "fraud_recovery_rate_pct": 35.0,
+    "investigation_cost_per_claim_tnd": 150.0,
+    "early_intervention_efficiency_pct": 40.0
+  }
+}

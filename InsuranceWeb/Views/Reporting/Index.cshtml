@@ -1,0 +1,238 @@
+@{
+    ViewData["Title"] = "Strategic Reporting";
+    var author = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+              ?? User.FindFirst("Login")?.Value
+              ?? "Analyst";
+    var today = DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+}
+
+<div class="page-header">
+    <h1>&#x1F4DD; Strategic Reporting</h1>
+    <p class="subtitle">Write and export strategic insights, notes, and analysis reports</p>
+</div>
+
+<!-- ═══ Report Metadata ═══ -->
+<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:1.5rem;">
+    <div class="kpi-card">
+        <div class="kpi-value text-primary" style="font-size:1.1rem;">@author</div>
+        <div class="kpi-label">Analyst</div>
+    </div>
+    <div class="kpi-card kpi-info">
+        <div class="kpi-value text-info" style="font-size:1.1rem;">@today</div>
+        <div class="kpi-label">Session Date</div>
+    </div>
+    <div class="kpi-card kpi-success">
+        <div class="kpi-value text-success" id="wordCountDisplay">0</div>
+        <div class="kpi-label">Words Written</div>
+    </div>
+    <div class="kpi-card kpi-warning">
+        <div class="kpi-value text-warning" id="charCountDisplay">0</div>
+        <div class="kpi-label">Characters</div>
+    </div>
+</div>
+
+<!-- ═══ Report Editor ═══ -->
+<form method="post" asp-action="Export" asp-controller="Reporting" id="reportForm">
+    @Html.AntiForgeryToken()
+
+    <div class="panel">
+        <div class="panel-header">
+            &#x270F;&#xFE0F; Report Editor
+            <span style="margin-left:auto;font-size:.8rem;font-weight:400;color:var(--text-muted);">
+                Draft is kept in this session — export to save permanently
+            </span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:1rem;">
+
+            <!-- Title row -->
+            <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+                <div style="flex:1;min-width:220px;">
+                    <label style="font-size:.78rem;font-weight:600;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:.35rem;">
+                        Report Title
+                    </label>
+                    <input type="text"
+                           name="reportTitle"
+                           id="reportTitle"
+                           placeholder="e.g. Q2 Fraud Risk Analysis – June 2026"
+                           style="width:100%;padding:.55rem .85rem;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);font-size:.97rem;color:var(--text-primary);background:#fff;transition:border-color .2s;"
+                           onfocus="this.style.borderColor='var(--primary)'"
+                           onblur="this.style.borderColor='#e2e8f0'" />
+                </div>
+                <div style="display:flex;gap:.6rem;align-items:center;">
+                    <label style="font-size:.78rem;font-weight:600;text-transform:uppercase;color:var(--text-muted);white-space:nowrap;">
+                        Export as
+                    </label>
+                    <select name="exportFormat"
+                            id="exportFormat"
+                            style="padding:.5rem .85rem;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);font-size:.9rem;background:#fff;cursor:pointer;">
+                        <option value="html">HTML (styled)</option>
+                        <option value="txt">Plain Text (.txt)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Textarea -->
+            <div>
+                <label style="font-size:.78rem;font-weight:600;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:.35rem;">
+                    Report Content
+                </label>
+                <textarea name="reportContent"
+                          id="reportContent"
+                          rows="20"
+                          placeholder="Write your strategic insights, observations, risk analysis, or recommendations here...
+
+For example:
+• Key findings from the delay prediction model
+• Fraud pattern observations for this period
+• Cost forecast deviations and recommended actions
+• Staffing recommendations based on workload index
+• Any anomalies or notable trends worth escalating"
+                          style="width:100%;padding:1rem 1.1rem;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);font-size:.97rem;line-height:1.8;color:var(--text-primary);background:#fafcff;resize:vertical;min-height:420px;font-family:'Segoe UI',Arial,sans-serif;transition:border-color .2s;"
+                          onfocus="this.style.borderColor='var(--primary)'"
+                          onblur="this.style.borderColor='#e2e8f0'"></textarea>
+            </div>
+
+            <!-- Action bar -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;padding-top:.25rem;border-top:1px solid #f1f5f9;">
+                <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                    <button type="button"
+                            onclick="insertTemplate('summary')"
+                            style="padding:.4rem .9rem;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);background:#f8fafc;font-size:.82rem;cursor:pointer;color:var(--text-primary);">
+                        + Summary Template
+                    </button>
+                    <button type="button"
+                            onclick="insertTemplate('risk')"
+                            style="padding:.4rem .9rem;border:1.5px solid #e2e8f0;border-radius:var(--radius-sm);background:#f8fafc;font-size:.82rem;cursor:pointer;color:var(--text-primary);">
+                        + Risk Template
+                    </button>
+                    <button type="button"
+                            onclick="clearEditor()"
+                            style="padding:.4rem .9rem;border:1.5px solid #fca5a5;border-radius:var(--radius-sm);background:#fff5f5;font-size:.82rem;cursor:pointer;color:#ef4444;">
+                        Clear
+                    </button>
+                </div>
+                <button type="submit"
+                        class="btn-apply"
+                        style="padding:.6rem 1.8rem;font-size:.95rem;display:flex;align-items:center;gap:.5rem;">
+                    &#x2B07;&#xFE0F; Export Report
+                </button>
+            </div>
+
+        </div>
+    </div>
+</form>
+
+<!-- ═══ Tips Panel ═══ -->
+<div class="panel" style="margin-top:1.25rem;">
+    <div class="panel-header">&#x1F4A1; Reporting Tips</div>
+    <div class="panel-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+            <div style="padding:.75rem 1rem;border-left:3px solid var(--primary);background:#f8fafc;border-radius:0 var(--radius-sm) var(--radius-sm) 0;">
+                <div style="font-weight:700;font-size:.88rem;margin-bottom:.3rem;">HTML Export</div>
+                <div style="font-size:.82rem;color:var(--text-muted);">Produces a styled document you can open in any browser and print as PDF using Ctrl+P → Save as PDF.</div>
+            </div>
+            <div style="padding:.75rem 1rem;border-left:3px solid var(--success);background:#f8fafc;border-radius:0 var(--radius-sm) var(--radius-sm) 0;">
+                <div style="font-weight:700;font-size:.88rem;margin-bottom:.3rem;">Plain Text Export</div>
+                <div style="font-size:.82rem;color:var(--text-muted);">Clean .txt file with report metadata — ideal for pasting into emails, tickets, or other documents.</div>
+            </div>
+            <div style="padding:.75rem 1rem;border-left:3px solid var(--warning);background:#f8fafc;border-radius:0 var(--radius-sm) var(--radius-sm) 0;">
+                <div style="font-weight:700;font-size:.88rem;margin-bottom:.3rem;">Templates</div>
+                <div style="font-size:.82rem;color:var(--text-muted);">Use the quick-insert buttons to pre-fill common report structures. You can edit or extend them freely.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var textarea = document.getElementById('reportContent');
+    var wordEl   = document.getElementById('wordCountDisplay');
+    var charEl   = document.getElementById('charCountDisplay');
+
+    function updateCounts() {
+        var text  = textarea.value;
+        var words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+        wordEl.textContent = words.toLocaleString();
+        charEl.textContent = text.length.toLocaleString();
+    }
+
+    textarea.addEventListener('input', updateCounts);
+    updateCounts();
+})();
+
+var TEMPLATES = {
+    summary: [
+        'EXECUTIVE SUMMARY',
+        '==================',
+        '',
+        'Reporting Period : [Month/Quarter]',
+        'Prepared by      : ' + document.querySelector('.kpi-value.text-primary')?.textContent?.trim(),
+        'Date             : ' + new Date().toLocaleDateString('en-GB'),
+        '',
+        '1. KEY FINDINGS',
+        '---------------',
+        '• [Finding 1]',
+        '• [Finding 2]',
+        '• [Finding 3]',
+        '',
+        '2. OBSERVATIONS',
+        '---------------',
+        '[Describe the main trends or anomalies observed across delay, cost, fraud, and forecast models.]',
+        '',
+        '3. RECOMMENDATIONS',
+        '------------------',
+        '• [Action 1 — responsible team — deadline]',
+        '• [Action 2 — responsible team — deadline]',
+        '',
+        '4. CONCLUSION',
+        '-------------',
+        '[Summarise the overall risk posture and next steps.]'
+    ].join('\n'),
+
+    risk: [
+        'RISK ASSESSMENT REPORT',
+        '======================',
+        '',
+        'Assessment Date : ' + new Date().toLocaleDateString('en-GB'),
+        'Scope           : [Delay / Cost / Fraud / Forecast]',
+        '',
+        'RISK MATRIX',
+        '-----------',
+        'HIGH RISK ITEMS',
+        '  • [Description] — Probability: [X%] — Impact: [TND value]',
+        '',
+        'MEDIUM RISK ITEMS',
+        '  • [Description] — Probability: [X%] — Impact: [TND value]',
+        '',
+        'LOW RISK ITEMS',
+        '  • [Description]',
+        '',
+        'MITIGATION ACTIONS',
+        '------------------',
+        '1. [Action] — Owner: [Team] — Due: [Date]',
+        '2. [Action] — Owner: [Team] — Due: [Date]',
+        '',
+        'ESCALATION',
+        '----------',
+        '[Items requiring manager or executive attention.]'
+    ].join('\n')
+};
+
+function insertTemplate(type) {
+    var ta = document.getElementById('reportContent');
+    var existing = ta.value.trim();
+    ta.value = existing ? existing + '\n\n' + TEMPLATES[type] : TEMPLATES[type];
+    ta.dispatchEvent(new Event('input'));
+    ta.focus();
+    ta.scrollTop = ta.scrollHeight;
+}
+
+function clearEditor() {
+    if (!confirm('Clear the editor? This cannot be undone.')) return;
+    document.getElementById('reportContent').value = '';
+    document.getElementById('reportTitle').value   = '';
+    document.getElementById('reportContent').dispatchEvent(new Event('input'));
+}
+</script>
+}

@@ -1,0 +1,217 @@
+@model List<InsuranceWeb.Models.AuditLog>
+@{
+    ViewData["Title"] = "Audit Log";
+    var selectedSeverity = ViewBag.SelectedSeverity as string;
+    var selectedEventType = ViewBag.SelectedEventType as string;
+}
+
+<div class="page-wrapper">
+    <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>&#x1F4CB; Audit Log</h1>
+                <p class="subtitle">Track login activity, security alerts, and suspicious behavior</p>
+            </div>
+            <a asp-action="Index" class="btn-back-link" style="font-size:.9rem;">
+                &larr; Back to Admin Dashboard
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert-banner alert-success-banner">
+            <span>&#x2705;</span> @TempData["Success"]
+        </div>
+    }
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit,minmax(140px,1fr));">
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-value text-danger">@ViewBag.UnresolvedCount</div>
+            <div class="kpi-label">Unresolved Errors</div>
+        </div>
+        <div class="kpi-card kpi-critical">
+            <div class="kpi-value text-critical">@ViewBag.TotalErrors</div>
+            <div class="kpi-label">Total Errors</div>
+        </div>
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-value text-warning">@ViewBag.TotalWarnings</div>
+            <div class="kpi-label">Warnings</div>
+        </div>
+        <div class="kpi-card kpi-success">
+            <div class="kpi-value text-success">@ViewBag.TotalSuccess</div>
+            <div class="kpi-label">Successful Logins</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="audit-filter-bar">
+        <div class="audit-filter-group">
+            <label>Severity</label>
+            <select name="severity">
+                <option value="">All</option>
+                <option value="ERROR" selected="@(selectedSeverity == "ERROR")">Error</option>
+                <option value="WARNING" selected="@(selectedSeverity == "WARNING")">Warning</option>
+                <option value="INFO" selected="@(selectedSeverity == "INFO")">Info</option>
+            </select>
+        </div>
+        <div class="audit-filter-group">
+            <label>Event Type</label>
+            <select name="eventType">
+                <option value="">All</option>
+                <option value="LOGIN_FAILED" selected="@(selectedEventType == "LOGIN_FAILED")">Login Failed</option>
+                <option value="LOGIN_SUCCESS" selected="@(selectedEventType == "LOGIN_SUCCESS")">Login Success</option>
+                <option value="ACCOUNT_LOCKED" selected="@(selectedEventType == "ACCOUNT_LOCKED")">Account Locked</option>
+                <option value="IP_CHANGE" selected="@(selectedEventType == "IP_CHANGE")">IP Change</option>
+            </select>
+        </div>
+        <button type="submit" class="btn-apply">Filter</button>
+        @if (!string.IsNullOrEmpty(selectedSeverity) || !string.IsNullOrEmpty(selectedEventType))
+        {
+            <a asp-action="AuditLog" class="btn-back-link" style="margin-left:.5rem;">Clear</a>
+        }
+    </form>
+
+    <!-- Audit Log Table -->
+    <div class="panel">
+        <div class="panel-header">&#x1F6E1;&#xFE0F; Security Events (@Model.Count entries)</div>
+        <div class="panel-body p-0">
+            <div style="overflow-x: auto;">
+                <table class="table-bi">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User</th>
+                            <th>Event</th>
+                            <th>Severity</th>
+                            <th>IP Address</th>
+                            <th>Message</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                                    No audit log entries found.
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var log in Model)
+                        {
+                            var rowClass = log.Severity switch
+                            {
+                                "ERROR" => "audit-row-error",
+                                "WARNING" => "audit-row-warning",
+                                _ => ""
+                            };
+                            var severityBadge = log.Severity switch
+                            {
+                                "ERROR" => "audit-badge-error",
+                                "WARNING" => "audit-badge-warning",
+                                _ => "audit-badge-info"
+                            };
+                            var eventIcon = log.EventType switch
+                            {
+                                "LOGIN_FAILED" => "&#x274C;",
+                                "LOGIN_SUCCESS" => "&#x2705;",
+                                "ACCOUNT_LOCKED" => "&#x1F512;",
+                                "IP_CHANGE" => "&#x1F310;",
+                                _ => "&#x2139;&#xFE0F;"
+                            };
+                            <tr class="@rowClass">
+                                <td style="white-space:nowrap;font-size:.8rem;">
+                                    @log.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                                </td>
+                                <td>
+                                    @if (log.User != null)
+                                    {
+                                        <strong>@log.User.Username</strong>
+                                        <br /><span style="font-size:.75rem;color:var(--text-muted);">@log.LoginAttempted</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--text-muted);">@log.LoginAttempted</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="audit-event-tag">
+                                        @Html.Raw(eventIcon) @log.EventType.Replace("_", " ")
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="audit-severity-badge @severityBadge">@log.Severity</span>
+                                </td>
+                                <td style="font-family:monospace;font-size:.82rem;">
+                                    @log.IpAddress
+                                    @if (!string.IsNullOrEmpty(log.PreviousIp))
+                                    {
+                                        <br /><span style="font-size:.72rem;color:var(--text-muted);">from: @log.PreviousIp</span>
+                                    }
+                                </td>
+                                <td style="font-size:.82rem;max-width:300px;">@log.Message</td>
+                                <td class="text-center">
+                                    @if (log.IsResolved)
+                                    {
+                                        <span class="badge-risk badge-low" title="Resolved by @log.ResolvedBy at @log.ResolvedAt?.ToString("g")">
+                                            Resolved
+                                        </span>
+                                    }
+                                    else if (log.Severity == "ERROR")
+                                    {
+                                        <span class="badge-risk badge-critical">Action Needed</span>
+                                    }
+                                    else if (log.Severity == "WARNING")
+                                    {
+                                        <span class="badge-risk badge-medium">Pending</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--text-muted);font-size:.8rem;">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!log.IsResolved && (log.Severity == "ERROR" || log.Severity == "WARNING"))
+                                    {
+                                        <div class="audit-actions">
+                                            @if (log.UserId != null && (log.EventType == "ACCOUNT_LOCKED" || log.ConsecutiveFailures >= 3))
+                                            {
+                                                <form method="post" asp-action="ResetPasswordFromAudit" style="display:inline;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="logId" value="@log.LogId" />
+                                                    <input type="hidden" name="userId" value="@log.UserId" />
+                                                    <button type="submit" class="audit-action-btn audit-btn-reset"
+                                                            title="Reset password & resolve"
+                                                            onclick="return confirm('Reset password for this user?');">
+                                                        &#x1F511; Reset Password
+                                                    </button>
+                                                </form>
+                                            }
+                                            @if (log.UserId != null)
+                                            {
+                                                <a asp-action="EditUser" asp-route-id="@log.UserId"
+                                                   class="audit-action-btn audit-btn-details" title="View user details">
+                                                    &#x1F50D; Details
+                                                </a>
+                                            }
+                                            <form method="post" asp-action="ResolveAlert" style="display:inline;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@log.LogId" />
+                                                <button type="submit" class="audit-action-btn audit-btn-resolve" title="Mark as resolved">
+                                                    &#x2705; Resolve
+                                                </button>
+                                            </form>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

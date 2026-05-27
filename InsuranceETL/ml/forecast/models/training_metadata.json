@@ -1,0 +1,165 @@
+{
+  "trained_at": "2026-03-23T17:52:37.007359",
+  "data_source": "ml.ml_claim",
+  "months_of_history": 98,
+  "date_range": {
+    "from": "2018-01-01",
+    "to": "2026-02-01"
+  },
+  "kpis_trained": [
+    "claim_volume",
+    "total_indemnisation",
+    "delay_rate",
+    "fraud_rate",
+    "avg_claim_amount"
+  ],
+  "forecast_horizon_months": 6,
+  "seasonal_period": 12,
+  "model_results": {
+    "claim_volume": {
+      "model_path": "ml/forecast/models\\claim_volume_sarima.pkl",
+      "meta": {
+        "order": [
+          0,
+          1,
+          1
+        ],
+        "seasonal_order": [
+          0,
+          1,
+          1,
+          12
+        ],
+        "aic": 691.1460628212293,
+        "metrics": {
+          "mae": 1339.5248,
+          "mape_pct": 47.49,
+          "rmse": 1737.5793,
+          "holdout_months": 3
+        }
+      },
+      "n_months": 98,
+      "last_date": "2026-02-01",
+      "mean_value": 563.795918367347,
+      "std_value": 388.5316518885572,
+      "unit": "claims",
+      "description": "Monthly number of new claims"
+    },
+    "total_indemnisation": {
+      "model_path": "ml/forecast/models\\total_indemnisation_sarima.pkl",
+      "meta": {
+        "order": [
+          0,
+          1,
+          1
+        ],
+        "seasonal_order": [
+          0,
+          1,
+          1,
+          12
+        ],
+        "aic": 1834.5568180918824,
+        "metrics": {
+          "mae": 6540996.6638,
+          "mape_pct": 55.13,
+          "rmse": 8769435.4041,
+          "holdout_months": 3
+        }
+      },
+      "n_months": 98,
+      "last_date": "2026-02-01",
+      "mean_value": 1898069.1757878843,
+      "std_value": 1718195.5902345425,
+      "unit": "TND",
+      "description": "Monthly total indemnisation payout (TND)"
+    },
+    "delay_rate": {
+      "model_path": "ml/forecast/models\\delay_rate_sarima.pkl",
+      "meta": {
+        "order": [
+          0,
+          1,
+          1
+        ],
+        "seasonal_order": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "aic": -446.5002635039169,
+        "metrics": {
+          "mae": 0.0244,
+          "mape_pct": 10.64,
+          "rmse": 0.0263,
+          "holdout_months": 3
+        }
+      },
+      "n_months": 98,
+      "last_date": "2026-02-01",
+      "mean_value": 0.22758408759029874,
+      "std_value": 0.02633753359402953,
+      "unit": "rate",
+      "description": "Monthly proportion of delayed claims (0-1)"
+    },
+    "fraud_rate": {
+      "model_path": "ml/forecast/models\\fraud_rate_sarima.pkl",
+      "meta": {
+        "order": [
+          0,
+          1,
+          1
+        ],
+        "seasonal_order": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "aic": -637.0716202367378,
+        "metrics": {
+          "mae": 0.0036,
+          "mape_pct": 11.32,
+          "rmse": 0.0037,
+          "holdout_months": 3
+        }
+      },
+      "n_months": 98,
+      "last_date": "2026-02-01",
+      "mean_value": 0.031200369247645743,
+      "std_value": 0.008656707819075883,
+      "unit": "rate",
+      "description": "Monthly proportion of fraudulent claims (0-1)"
+    },
+    "avg_claim_amount": {
+      "model_path": "ml/forecast/models\\avg_claim_amount_sarima.pkl",
+      "meta": {
+        "order": [
+          0,
+          1,
+          1
+        ],
+        "seasonal_order": [
+          0,
+          1,
+          1,
+          12
+        ],
+        "aic": 918.269995317721,
+        "metrics": {
+          "mae": 812.0561,
+          "mape_pct": 19.15,
+          "rmse": 1058.8237,
+          "holdout_months": 3
+        }
+      },
+      "n_months": 98,
+      "last_date": "2026-02-01",
+      "mean_value": 3318.5600877420375,
+      "std_value": 292.20988789749896,
+      "unit": "TND",
+      "description": "Monthly average claim amount (TND)"
+    }
+  }
+}
